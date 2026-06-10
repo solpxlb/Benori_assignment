@@ -3,27 +3,27 @@
 Derived from PLAN.md. Work one phase at a time; do not start a phase until the previous phase's acceptance checks pass. Commit per phase: `phase N: <summary>`.
 
 ## Phase 0 — Scaffold & de-risk (30–45 min)
-- [ ] Create repo skeleton: `app.py` (st.title placeholder), `README.md`, `requirements.txt`, `.gitignore`, `docs/architecture.mmd`, `data/`, `outputs/.gitkeep`, `src/__init__.py`, `src/config.py`, `tests/__init__.py`
-- [ ] Write `requirements.txt` (streamlit, pandas, requests, feedparser, rapidfuzz, scikit-learn, tldextract, pyyaml, python-docx, XlsxWriter, pytest)
-- [ ] Write throwaway `scripts/probe_sources.py`: probe GDELT DOC 2.0, Google News RSS, PR-wire RSS feeds
-- [ ] Record probe findings as comment block (counts, JSON quirks, date formats); note which PR-wire feeds are alive (decision gate for Phase 2 rss_feeds connector)
-- [ ] Acceptance: `pip install -r requirements.txt` succeeds
-- [ ] Acceptance: probe prints real titles from both sources (or documents failures exactly)
-- [ ] Acceptance: `streamlit run app.py` shows placeholder
-- [ ] Commit `phase 0: ...`
+- [x] Create repo skeleton: `app.py` (st.title placeholder), `README.md`, `requirements.txt`, `.gitignore`, `docs/architecture.mmd`, `data/`, `outputs/.gitkeep`, `src/__init__.py`, `src/config.py`, `tests/__init__.py`
+- [x] Write `requirements.txt` (streamlit, pandas, requests, feedparser, rapidfuzz, scikit-learn, tldextract, pyyaml, python-docx, XlsxWriter, pytest)
+- [x] Write throwaway `scripts/probe_sources.py`: probe GDELT DOC 2.0, Google News RSS, PR-wire RSS feeds
+- [x] Record probe findings as comment block (counts, JSON quirks, date formats); note which PR-wire feeds are alive (decision gate for Phase 2 rss_feeds connector) — *findings: quote only multi-word phrases, `sourcelang:english` required, rate limit 1 req/5s; live feeds: prnewswire-consumer, globenewswire-ma, globenewswire-consumer; businesswire dead*
+- [x] Acceptance: `pip install -r requirements.txt` succeeds
+- [x] Acceptance: probe prints real titles from both sources (or documents failures exactly)
+- [x] Acceptance: `streamlit run app.py` shows placeholder
+- [x] Commit `phase 0: ...` (4a07c3a)
 
 ## Phase 1 — Config, queries, data model (45 min)
-- [ ] `src/config.py`: term lists verbatim (FMCG_TERMS, CATEGORY_TERMS, STRONG/SOFT_DEAL_TERMS, COMPANY_WATCHLIST, NEGATIVE_TERMS)
-- [ ] 5 query families, each as GDELT-syntax string + plain-text RSS variant (general, F&B, beauty/personal care, PE/funding, watchlist)
-- [ ] Constants: `GDELT_TIMEOUT=10`, `MAX_RECORDS_PER_QUERY=75`, dedupe/cluster thresholds, cutoffs `INCLUDE=70`, `WATCHLIST=55` — each with a one-line comment
-- [ ] `src/models.py`: plain dataclass `Article` with full schema + `to_dict()`
-- [ ] Acceptance: `from src.config import *` works, all lists non-empty
-- [ ] Acceptance: query builder produces 5 valid GDELT query strings (parenthesized ORs, quoted phrases)
-- [ ] Commit `phase 1: ...`
+- [x] `src/config.py`: term lists verbatim (FMCG_TERMS, CATEGORY_TERMS, STRONG/SOFT_DEAL_TERMS, COMPANY_WATCHLIST, NEGATIVE_TERMS)
+- [x] 5 query families, each as GDELT-syntax string + plain-text RSS variant (general, F&B, beauty/personal care, PE/funding, watchlist)
+- [x] Constants: `GDELT_TIMEOUT=10`, `MAX_RECORDS_PER_QUERY=75`, dedupe/cluster thresholds, cutoffs `INCLUDE=70`, `WATCHLIST=55` — each with a one-line comment (plus `GDELT_SLEEP_BETWEEN=5.0` from probe finding)
+- [x] `src/models.py`: plain dataclass `Article` with full schema + `to_dict()`
+- [x] Acceptance: `from src.config import *` works, all lists non-empty
+- [x] Acceptance: query builder produces 5 valid GDELT query strings (parenthesized ORs, quoted phrases)
+- [x] Commit `phase 1: ...` (ceca582)
 
 ## Phase 2 — Ingestion (1.5 h)
 - [ ] `src/sources/__init__.py` exporting `fetch_all`
-- [ ] `src/sources/gdelt.py`: `fetch_gdelt(...)` — defensive JSON parse, `seendate` → UTC datetime, `snippet=""`, 0.5s sleep between queries
+- [ ] `src/sources/gdelt.py`: `fetch_gdelt(...)` — defensive JSON parse, `seendate` → UTC datetime, `snippet=""`, 5s sleep between queries (probe finding: GDELT enforces 1 req/5s, not the 0.5s in the original plan)
 - [ ] `src/sources/google_news.py`: `fetch_google_news(...)` — feedparser, `source.title` as source name, strip HTML from summary
 - [ ] `src/sources/rss_feeds.py`: ONLY if Phase 0 probe confirmed live feeds; otherwise README mention only
 - [ ] `fetch_all(timespan)`: concat, assign `article_id` (uuid4 hex[:12]), drop empty title/url rows
