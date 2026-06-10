@@ -62,7 +62,9 @@ def _within_window(df: pd.DataFrame, idx_a, idx_b) -> bool:
     a, b = df.loc[idx_a, "published_at"], df.loc[idx_b, "published_at"]
     if pd.isna(a) or pd.isna(b):
         return False
-    return abs((a - b).days) <= DEDUPE_DATE_WINDOW_DAYS
+    # abs() on the timedelta itself, not .days: timedelta.days floors toward
+    # -inf, making the window direction-sensitive (-14.5d -> -15, +14.5d -> 14).
+    return abs(a - b) <= pd.Timedelta(days=DEDUPE_DATE_WINDOW_DAYS)
 
 
 def _mark_group(df: pd.DataFrame, indices: list, reason: str,
