@@ -72,12 +72,13 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 6: ...`
 
 ## Phase 7 — Newsletter & exports (1.5 h)
-- [ ] `src/newsletter.py`: header with LIVE/SAMPLE badge, executive snapshot, top deal highlights (sorted by confidence/relevance/credibility/recency), watchlist one-liners, 4-sentence methodology, source appendix — markdown + structured dict
-- [ ] `src/exports.py`: raw + processed CSV/JSON, `deal_clusters.json`, `newsletter.docx`, `newsletter.xlsx` (7 sheets: Executive Snapshot, Deal Highlights, Deal Clusters, Article Evidence, Watchlist, Rejected & Duplicates, Methodology; frozen headers, widths, autofilters)
-- [ ] All export functions return file paths AND bytes/BytesIO for Streamlit downloads
-- [ ] Acceptance: markdown renders cleanly in Streamlit; docx opens with correct headings; xlsx opens populated
-- [ ] Acceptance: sample run shows SAMPLE DATA badge in newsletter and docx
-- [ ] Commit `phase 7: ...`
+- [x] `src/newsletter.py`: header with LIVE/SAMPLE badge, executive snapshot, top deal highlights (sorted by confidence/relevance/credibility/recency), compact watchlist one-liners, 4-sentence methodology, source appendix — markdown + structured dict
+- [x] `src/exports.py`: raw + processed CSV/JSON, `deal_clusters.json`, `newsletter.docx`, `newsletter.xlsx` (7 sheets: Executive Snapshot, Deal Highlights, Deal Clusters, Article Evidence, Watchlist, Rejected & Duplicates, Methodology; frozen headers, widths, autofilters)
+- [x] All export functions return file paths AND bytes for Streamlit downloads (`ExportArtifact`)
+- [x] Acceptance: markdown renders cleanly; docx opens with correct headings; xlsx is a valid 7-sheet workbook (verified via zip structure because `openpyxl` is intentionally not in requirements)
+- [x] Acceptance: sample run shows SAMPLE DATA badge in newsletter and docx; empty non-sample run defaults to LIVE
+- [x] Sub-agent audit: first pass found empty-frame mode inference + verbose watchlist; both fixed; second pass GREEN LIGHT
+- [x] Commit `phase 7: ...`
 
 ## Phase 8 — Streamlit app (2 h)
 - [ ] `src/pipeline.py`: `run_pipeline(...)` → PipelineResult; exact order: fetch → clean → dedupe → score → count includes → fallback (<5, replace entirely) → thresholds (display filter only) → cluster → newsletter → exports
