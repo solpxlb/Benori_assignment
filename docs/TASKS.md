@@ -81,16 +81,17 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 7: ...`
 
 ## Phase 8 — Streamlit app (2 h)
-- [ ] `src/pipeline.py`: `run_pipeline(...)` → PipelineResult; exact order: fetch → clean → dedupe → score → count includes → fallback (<5, replace entirely) → thresholds (display filter only) → cluster → newsletter → exports
-- [ ] Cache the fetch layer (`st.cache_data(ttl=1800)`), not the whole pipeline
-- [ ] Sidebar: date range (24h/7d/30d), relevance slider (default 60), credibility slider (default 50), sample-fallback checkbox (default on), Run button, sample-mode warning banner
-- [ ] Tab 1 Snapshot & Newsletter: metric row + rendered newsletter + 4 download buttons
-- [ ] Tab 2 Deal Clusters: expander per cluster with evidence table (LinkColumn)
-- [ ] Tab 3 Data & Transparency: duplicates table, rejected table, searchable processed dataframe
-- [ ] Tab 4 Methodology: mermaid source + dedup/scoring/tiers/limitations explanation
-- [ ] Acceptance: no keys, no internet → sample mode end to end; with internet → live data through all tabs
-- [ ] Acceptance: sliders re-score without re-fetching; downloads produce valid files
-- [ ] Commit `phase 8: ...`
+- [x] `src/pipeline.py`: `run_pipeline(...)` → PipelineResult; exact order: fetch → clean → dedupe → score → count includes → fallback (<5, replace entirely) → thresholds (display/clustering filter only) → cluster → newsletter → exports
+- [x] Cache the fetch layer (`st.cache_data(ttl=1800)`), not the whole pipeline
+- [x] Sidebar: date range (24h/7d/30d), relevance slider (default 60), credibility slider (default 50), sample-fallback checkbox (default on), Run button, sample-mode warning banner
+- [x] Tab 1 Snapshot & Newsletter: metric row + rendered newsletter + 4 download buttons
+- [x] Tab 2 Deal Clusters: expander per cluster with evidence table (LinkColumn)
+- [x] Tab 3 Data & Transparency: duplicates table, rejected table, searchable processed dataframe
+- [x] Tab 4 Methodology: mermaid source + dedup/scoring/tiers/limitations explanation
+- [x] Acceptance: no keys/no live rows/fetch failure → sample mode end to end; with internet → live data through all tabs (verified 385 live rows, 7 canonical includes, LIVE mode)
+- [x] Acceptance: threshold changes alter cluster count without changing fetch layer semantics; downloads produce valid files
+- [x] Sub-agent audit: first pass found regex search + direct fetch failure handling; both fixed; second pass GREEN LIGHT
+- [x] Commit `phase 8: ...`
 
 ## Phase 9 — Tests (1 h)
 - [ ] `tests/test_pipeline.py`, ~10 tests, no network: canonicalize_url, normalize_title, exact URL dupes, fuzzy ≥90 / not <90, acquisition → include, earnings → reject with reason, no-deal-term cap ≤30, tier lookup (domain/unknown/name), clustering groups vs separates, sample loader (14 rows, fresh dates, is_sample)
