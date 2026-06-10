@@ -100,11 +100,14 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 9: ...`
 
 ## Phase 10 — README, diagram, deploy (1.5 h)
-- [ ] README per spec order: pitch (positioning line verbatim) · links · why clustering · source strategy · architecture diagram · pipeline walkthrough · dedup logic · relevance weights table · credibility (incl. single-source quirk) · run locally · outputs · honest assumptions & limitations · future enhancements
-- [ ] `docs/architecture.mmd` with the mermaid from PLAN.md
+- [x] README per spec order: pitch (positioning line verbatim) · links · why clustering · source strategy · architecture diagram · pipeline walkthrough · dedup logic · relevance weights table · credibility (incl. single-source quirk) · run locally · outputs · honest assumptions & limitations · future enhancements
+- [x] `docs/architecture.mmd` with the mermaid from PLAN.md
+- [x] Final-acceptance prep: Streamlit download row exposes raw CSV and raw JSON, plus DOCX/XLSX and clusters JSON
+- [x] Local verification: `.venv/bin/python -m pytest -q` green; no-network sample smoke produced required exports
+- [x] Sub-agent audit: first pass GREEN LIGHT for docs/diagram; second pass GREEN LIGHT after raw JSON download addition
 - [ ] Push to public GitHub; deploy to Streamlit Community Cloud; verify cold start + sample mode
 - [ ] Final acceptance: demo link works in incognito; repo has README/diagram/tests/no secrets; raw CSV/JSON downloadable; DOCX + XLSX newsletter; dedup+relevance explained in README and visible in Transparency tab; non-technical reader can skim newsletter in <2 min
-- [ ] Commit `phase 10: ...`
+- [x] Commit `phase 10: ...`
 
 ## Schedule
 - Day 1: Phases 0–5 — scored, deduped articles from live + sample data

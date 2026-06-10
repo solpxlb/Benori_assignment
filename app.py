@@ -103,7 +103,7 @@ def _render_snapshot_tab(result: PipelineResult) -> None:
     st.markdown(result.newsletter_md)
 
     st.subheader("Downloads")
-    d1, d2, d3, d4 = st.columns(4)
+    d1, d2, d3, d4, d5 = st.columns(5)
     with d1:
         _download_button("DOCX", result, "newsletter_docx", "download_docx")
     with d2:
@@ -112,6 +112,8 @@ def _render_snapshot_tab(result: PipelineResult) -> None:
         _download_button("Clusters JSON", result, "clusters_json", "download_clusters_json")
     with d4:
         _download_button("Raw CSV", result, "raw_csv", "download_raw_csv")
+    with d5:
+        _download_button("Raw JSON", result, "raw_json", "download_raw_json")
 
 
 def _render_clusters_tab(result: PipelineResult) -> None:
