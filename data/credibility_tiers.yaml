@@ -1,0 +1,14 @@
+# Source credibility tiers. Domain match first; name lists exist because Google News
+# RSS hides the real domain — match source_name case-insensitively as fallback.
+tier_1:  # base 90
+  domains: [reuters.com, bloomberg.com, ft.com, wsj.com, apnews.com, cnbc.com, bbc.com, nikkei.com]
+  names: [Reuters, Bloomberg, Financial Times, Wall Street Journal, AP News, CNBC, BBC]
+tier_2:  # base 75
+  domains: [fooddive.com, just-food.com, foodbev.com, cosmeticsdesign.com, beveragedaily.com,
+            retaildive.com, thegrocer.co.uk, economictimes.indiatimes.com, vccircle.com,
+            dealstreetasia.com, agfundernews.com, livemint.com, business-standard.com]
+  names: [Food Dive, Just Food, Retail Dive, The Grocer, Economic Times, Mint, VCCircle, DealStreetAsia]
+tier_3:  # base 60
+  domains: [prnewswire.com, businesswire.com, globenewswire.com]
+  names: [PR Newswire, Business Wire, GlobeNewswire]
+default_tier: 4  # base 45
