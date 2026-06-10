@@ -228,11 +228,32 @@ def score_articles(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def cluster_credibility(credibilities: list[int], domains: list[str],
+# Domains that are link redirectors, not publishers — corroboration counting must
+# fall back to source_name for rows whose URL resolves to one of these.
+REDIRECTOR_DOMAINS = {"google.com", "news.google.com"}
+
+
+def source_key(row: pd.Series) -> str:
+    """Identity key for independent-source counting in cluster corroboration.
+
+    Google News links hide the real publisher domain (everything resolves to
+    google.com), so for those rows the publisher name is the identity; for
+    everything else the registered domain is.
+    """
+    domain = (row.get("domain") or "").lower()
+    name = (row.get("source_name") or "").strip().lower()
+    if row.get("source_api") == "google_news_rss" or domain in REDIRECTOR_DOMAINS:
+        return name or domain
+    return domain or name
+
+
+def cluster_credibility(credibilities: list[int], source_keys: list[str],
                         tier_labels: list[str]) -> int:
     """Credibility of a deal-event cluster from its member articles' scores.
 
     0.60·max + 0.25·avg(top 3) + corroboration bonus, capped at 100.
+    `source_keys` must be per-article identity keys from source_key() — NOT raw
+    domains, or all Google News rows would collapse into one "source".
     Known quirk (intentional, documented in methodology): a single-source cluster
     scores BELOW its own article's credibility (lone Reuters 90 -> ~76) — one
     source is less certain than that source is credible; corroboration earns it back.
@@ -242,10 +263,10 @@ def cluster_credibility(credibilities: list[int], domains: list[str],
     ranked = sorted(credibilities, reverse=True)
     top3 = ranked[:3]
     score = CLUSTER_W_MAX * ranked[0] + CLUSTER_W_TOP3 * (sum(top3) / len(top3))
-    n_domains = len({d for d in domains if d})
-    if n_domains >= 3:
+    n_sources = len({k for k in source_keys if k})
+    if n_sources >= 3:
         score += CORROB_3_DOMAINS
-    elif n_domains >= 2:
+    elif n_sources >= 2:
         score += CORROB_2_DOMAINS
     if "tier_1" in tier_labels and "tier_3" in tier_labels:
         score += CORROB_OFFICIAL_MIX
