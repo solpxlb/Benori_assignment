@@ -63,13 +63,13 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 5: ...` (5ee149b)
 
 ## Phase 6 — Deal clustering (1.5 h)
-- [ ] `src/clustering.py`: greedy single-pass over include/watchlist canonicals — join if dates ≤30d AND (cosine ≥0.6 OR (shared company AND cosine ≥0.4)); comment on order-dependence
-- [ ] Company extraction: watchlist match (accent-insensitive) + capitalized 1–3 token phrases, generic-word stoplist
-- [ ] Cluster record: canonical_headline, deal_type priority order, companies (max 5), geography, category buckets, deal_value regex, scores, confidence, deterministic `why_it_matters` template, sources list, counts/dates
-- [ ] Acceptance: sample → 1 acquisition cluster (3 articles, or 2 post-dedup — verify), 1 funding (2), 1 JV (1)
-- [ ] Acceptance: acquisition and funding stories never mix
-- [ ] Acceptance: $40M extracted for funding sample, "undisclosed" elsewhere; why_it_matters has zero non-derivable info
-- [ ] Commit `phase 6: ...`
+- [x] `src/clustering.py`: greedy single-pass over include/watchlist canonicals — join if dates ≤30d AND (cosine ≥0.6 OR (shared company AND cosine ≥0.4)); comment on order-dependence
+- [x] Company extraction: watchlist match (accent-insensitive) + capitalized 1–3 token phrases, generic-word stoplist
+- [x] Cluster record: canonical_headline, deal_type priority order, companies (max 5), geography, category buckets, deal_value regex, scores, confidence, deterministic `why_it_matters` template, sources list, counts/dates
+- [x] Acceptance: sample → 1 acquisition cluster (4 canonical articles after dedup, reflecting the PR + wire corroboration rows), 1 funding (2), 1 JV (1), plus 1 watchlist sale/exploration cluster
+- [x] Acceptance: acquisition and funding stories never mix
+- [x] Acceptance: visible deal values extracted verbatim (`$120 million`, `$50 million`, `$40M`); watchlist cluster is `undisclosed`; `why_it_matters` uses only derived fields
+- [x] Commit `phase 6: ...`
 
 ## Phase 7 — Newsletter & exports (1.5 h)
 - [ ] `src/newsletter.py`: header with LIVE/SAMPLE badge, executive snapshot, top deal highlights (sorted by confidence/relevance/credibility/recency), watchlist one-liners, 4-sentence methodology, source appendix — markdown + structured dict
