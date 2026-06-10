@@ -33,13 +33,13 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 2: ...` (5dd9509)
 
 ## Phase 3 — Cleaning & sample data (1 h)
-- [ ] `src/cleaning.py`: `canonicalize_url`, `normalize_title`, `extract_domain`, `clean_snippet`, `apply_cleaning`
-- [ ] `data/sample_articles.csv`: 14 synthetic rows per spec (3-article acquisition cluster, 2-article funding cluster, JV, PR-wire row, utm near-dupe, exact URL dupe, 2 irrelevant, 1 watchlist-grade, 1 non-FMCG bank merger), `days_ago` offsets
-- [ ] `load_sample()`: shifts dates to now − N days, `is_sample=True`
-- [ ] Acceptance: `canonicalize_url("https://www.Site.com/a/?utm_source=x&b=2&a=1#frag")` → `https://site.com/a?a=1&b=2`
-- [ ] Acceptance: near-dupe sample titles normalize identically
-- [ ] Acceptance: `load_sample()` → 14 rows, fresh dates, `is_sample=True`
-- [ ] Commit `phase 3: ...`
+- [x] `src/cleaning.py`: `canonicalize_url`, `normalize_title`, `extract_domain`, `clean_snippet`, `apply_cleaning`
+- [x] `data/sample_articles.csv`: 14 synthetic rows per spec (3-article acquisition cluster, 2-article funding cluster, JV, PR-wire row, utm near-dupe, exact URL dupe, 2 irrelevant, 1 watchlist-grade, 1 non-FMCG bank merger), `days_ago` offsets — *14th row is a fuzzy near-dupe of article #1 ("$120 mln", token_set_ratio 96.2) so every dedup pass has sample coverage; domains spread across example.com/.org/.net so the acquisition cluster has 3 independent domains for the corroboration bonus*
+- [x] `load_sample()`: shifts dates to now − N days, `is_sample=True` (in `src/sample.py`)
+- [x] Acceptance: `canonicalize_url("https://www.Site.com/a/?utm_source=x&b=2&a=1#frag")` → `https://site.com/a?a=1&b=2`
+- [x] Acceptance: near-dupe sample titles normalize identically (BREAKING-prefix variant ≡ original; "X Acquires Y - Reuters" suffix-strip also verified)
+- [x] Acceptance: `load_sample()` → 14 rows, fresh dates (0–13d), `is_sample=True`
+- [x] Commit `phase 3: ...` (249cf63)
 
 ## Phase 4 — Deduplication (1 h)
 - [ ] `src/dedupe.py`: 4 passes — exact URL, exact title (14d), fuzzy title ≥90 (14d), TF-IDF cosine ≥0.82 (14d, optional) — with reason codes; duplicates flagged, never deleted
