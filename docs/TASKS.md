@@ -15,7 +15,7 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 ## Phase 1 — Config, queries, data model (45 min)
 - [x] `src/config.py`: term lists verbatim (FMCG_TERMS, CATEGORY_TERMS, STRONG/SOFT_DEAL_TERMS, COMPANY_WATCHLIST, NEGATIVE_TERMS)
 - [x] 5 query families, each as GDELT-syntax string + plain-text RSS variant (general, F&B, beauty/personal care, PE/funding, watchlist)
-- [x] Constants: `GDELT_TIMEOUT=10`, `MAX_RECORDS_PER_QUERY=75`, dedupe/cluster thresholds, cutoffs `INCLUDE=70`, `WATCHLIST=55` — each with a one-line comment (plus `GDELT_SLEEP_BETWEEN=5.0` from probe finding)
+- [x] Constants: `GDELT_TIMEOUT=10`, `MAX_RECORDS_PER_QUERY=75`, dedupe/cluster thresholds, cutoffs `INCLUDE=70`, `WATCHLIST=55` — each with a one-line comment (plus `GDELT_SLEEP_BETWEEN=10.0` — raised from the planned 0.5s after observing erratic 429s even at 5–8s spacing)
 - [x] `src/models.py`: plain dataclass `Article` with full schema + `to_dict()`
 - [x] Acceptance: `from src.config import *` works, all lists non-empty
 - [x] Acceptance: query builder produces 5 valid GDELT query strings (parenthesized ORs, quoted phrases)
@@ -27,7 +27,7 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] `src/sources/google_news.py`: `fetch_google_news(...)` — feedparser, `source.title` as source name, strip HTML from summary
 - [x] `src/sources/rss_feeds.py`: built for the 3 feeds the probe confirmed alive (prnewswire-consumer, globenewswire-ma, globenewswire-consumer); Business Wire dead → README mention only
 - [x] `fetch_all(timespan)`: concat, assign `article_id` (uuid4 hex[:12]), drop empty title/url rows
-- [x] Acceptance: live run returns combined DataFrame with >0 rows and correct columns (385 rows: 250 google_news, 75 gdelt, 60 pr_wire)
+- [x] Acceptance: live run returns combined DataFrame with >0 rows and correct columns (one historical run: 385 rows — 250 google_news, 75 gdelt, 60 pr_wire; GDELT counts vary run-to-run due to erratic 429 throttling, fallback sources carry the volume)
 - [x] Acceptance: network failure → empty DataFrame, no exception (verified per-connector with unreachable hosts)
 - [x] Acceptance: dates are timezone-aware UTC (385/385)
 - [x] Commit `phase 2: ...` (5dd9509)

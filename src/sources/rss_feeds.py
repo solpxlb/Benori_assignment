@@ -37,6 +37,16 @@ def fetch_rss_feeds(feeds: list[dict] | None = None) -> pd.DataFrame:
         except (requests.RequestException, Exception) as e:
             logger.warning("PR-wire feed %s failed: %s", label, e)
             continue
+        if resp.status_code != 200:
+            logger.warning("PR-wire feed %s HTTP %s", label, resp.status_code)
+            continue
+        if feed.bozo and not feed.entries:
+            logger.warning("PR-wire feed %s unparseable: %s",
+                           label, getattr(feed, "bozo_exception", "unknown"))
+            continue
+        if not feed.entries:
+            logger.warning("PR-wire feed %s returned zero entries (dead feed?)", label)
+            continue
         retrieved = utc_now()
         for entry in feed.entries:
             rows.append({

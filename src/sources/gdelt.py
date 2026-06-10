@@ -36,8 +36,12 @@ def fetch_gdelt(queries: list[str], timespan: str = "7d",
     parse errors — each failing query contributes zero rows and logs a warning.
     """
     rows: list[dict] = []
-    for i, query in enumerate(queries):
-        if i > 0:
+    # Pacing only matters for requests that reached the server; after a connection
+    # failure (offline, DNS, timeout) skip the sleep so the zero-internet sample-mode
+    # path fails fast instead of burning the full sleep chain.
+    last_request_reached_server = False
+    for query in queries:
+        if last_request_reached_server:
             time.sleep(GDELT_SLEEP_BETWEEN)
         params = {
             "query": query,
@@ -51,7 +55,9 @@ def fetch_gdelt(queries: list[str], timespan: str = "7d",
             resp = requests.get(GDELT_ENDPOINT, params=params, timeout=GDELT_TIMEOUT)
         except requests.RequestException as e:
             logger.warning("GDELT request failed for query %r: %s", query, e)
+            last_request_reached_server = False
             continue
+        last_request_reached_server = True
         if "json" not in (resp.headers.get("content-type") or ""):
             logger.warning("GDELT non-JSON response (HTTP %s) for query %r: %r",
                            resp.status_code, query, resp.text[:120])

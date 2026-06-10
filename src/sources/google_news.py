@@ -55,6 +55,16 @@ def fetch_google_news(queries: list[str], max_per_query: int = 50) -> pd.DataFra
         except (requests.RequestException, Exception) as e:  # feedparser is unpredictable
             logger.warning("Google News RSS failed for query %r: %s", query, e)
             continue
+        if resp.status_code != 200:
+            logger.warning("Google News RSS HTTP %s for query %r", resp.status_code, query)
+            continue
+        if feed.bozo and not feed.entries:
+            logger.warning("Google News RSS unparseable for query %r: %s",
+                           query, getattr(feed, "bozo_exception", "unknown"))
+            continue
+        if not feed.entries:
+            logger.warning("Google News RSS returned zero entries for query %r", query)
+            continue
         retrieved = utc_now()
         for entry in feed.entries[:max_per_query]:
             source_name = entry.get("source", {}).get("title") or "Google News"

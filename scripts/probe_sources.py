@@ -56,7 +56,11 @@ import requests
 TIMEOUT = 10
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-GDELT_QUERY = '("acquisition" OR "merger" OR "stake") (FMCG OR "consumer goods" OR food OR beverage)'
+# Verified shape (see FINDINGS): quote only multi-word phrases, force English.
+# The original probe used quoted single words ("FMCG", "food") which returns an
+# HTML error page — kept here as a comment for the record:
+#   '("acquisition" OR "merger" OR "stake") ("FMCG" OR "consumer goods" OR "food" OR "beverage")'
+GDELT_QUERY = '(acquisition OR merger OR "stake sale") (FMCG OR "consumer goods" OR food OR beverage) sourcelang:english'
 
 GOOGLE_NEWS_URL = (
     "https://news.google.com/rss/search?q="
