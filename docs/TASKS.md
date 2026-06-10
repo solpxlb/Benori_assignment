@@ -107,7 +107,8 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Sub-agent audit: first pass GREEN LIGHT for docs/diagram; second pass GREEN LIGHT after raw JSON download addition
 - [x] GitHub repo created and pushed: https://github.com/solpxlb/Benori_assignment
 - [x] Streamlit app deployed: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/
-- [ ] Push hotfix and verify redeployed app cold-start + sample/live quality
+- [x] Hotfix pushed to GitHub (`12085cc`); local replay verifies sample/live quality
+- [ ] Verify redeployed app cold-start in incognito after Streamlit app access is public
 - [ ] Final acceptance: demo link works in incognito; repo has README/diagram/tests/no secrets; raw CSV/JSON downloadable; DOCX + XLSX newsletter; dedup+relevance explained in README and visible in Transparency tab; non-technical reader can skim newsletter in <2 min
 - [x] Commit `phase 10: ...`
 
@@ -119,7 +120,8 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Escape dollar values in newsletter markdown
 - [x] Surface primary-source contribution warnings
 - [x] Add regression tests for freshness fallback, Google `when:`, market/off-topic noise, confidence, display filtering, entity cleanup, and markdown escaping
-- [ ] Push redeploy hotfix and verify deployed app
+- [x] Push redeploy hotfix (`12085cc`)
+- [ ] Verify deployed app after Streamlit auth/public access is resolved
 
 ## Schedule
 - Day 1: Phases 0–5 — scored, deduped articles from live + sample data
