@@ -1,0 +1,11 @@
+streamlit
+pandas
+requests
+feedparser
+rapidfuzz
+scikit-learn
+tldextract
+pyyaml
+python-docx
+XlsxWriter
+pytest
