@@ -72,7 +72,8 @@ def extract_domain(url: str) -> str:
     if not url:
         return ""
     ext = tldextract.extract(url)
-    return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+    domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+    return domain.lower()
 
 
 def clean_snippet(text: str) -> str:
@@ -94,8 +95,12 @@ def apply_cleaning(df: pd.DataFrame) -> pd.DataFrame:
         return df
     df["canonical_url"] = df["url"].fillna("").map(canonicalize_url)
     df["normalized_title"] = df["title"].fillna("").map(normalize_title)
+    # Always derive from the URL so domains are normalized registered domains
+    # (lowercase, no www.); fall back to normalizing any connector-supplied value
+    # (e.g. GDELT's domain field) only when URL extraction yields nothing.
     df["domain"] = df.apply(
-        lambda r: r["domain"] if r.get("domain") else extract_domain(r["url"]), axis=1
+        lambda r: extract_domain(r["url"]) or extract_domain(str(r.get("domain") or "")),
+        axis=1,
     )
     df["snippet"] = df["snippet"].fillna("").map(clean_snippet)
     df["published_at"] = pd.to_datetime(df["published_at"], utc=True, errors="coerce")
