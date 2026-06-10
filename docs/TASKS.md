@@ -94,9 +94,10 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 8: ...`
 
 ## Phase 9 — Tests (1 h)
-- [ ] `tests/test_pipeline.py`, ~10 tests, no network: canonicalize_url, normalize_title, exact URL dupes, fuzzy ≥90 / not <90, acquisition → include, earnings → reject with reason, no-deal-term cap ≤30, tier lookup (domain/unknown/name), clustering groups vs separates, sample loader (14 rows, fresh dates, is_sample)
-- [ ] Acceptance: `pytest -q` green in <10s
-- [ ] Commit `phase 9: ...`
+- [x] `tests/test_pipeline.py`, 13 no-network tests: canonicalize_url, normalize_title, exact URL dupes, fuzzy ≥90 / not <90, acquisition → include, earnings → reject with reason, no-deal-term cap ≤30, tier lookup (domain/unknown/name), clustering groups vs separates, sample loader (14 rows, fresh dates, is_sample), pipeline fallback/no-mixing, threshold behavior, empty-live/no-fallback
+- [x] Acceptance: `.venv/bin/python -m pytest -q` green in <10s (13 passed in 1.66s locally; audit rerun also green)
+- [x] Sub-agent audit: GREEN LIGHT; socket-blocked audit run confirmed no hidden network calls
+- [x] Commit `phase 9: ...`
 
 ## Phase 10 — README, diagram, deploy (1.5 h)
 - [ ] README per spec order: pitch (positioning line verbatim) · links · why clustering · source strategy · architecture diagram · pipeline walkthrough · dedup logic · relevance weights table · credibility (incl. single-source quirk) · run locally · outputs · honest assumptions & limitations · future enhancements
