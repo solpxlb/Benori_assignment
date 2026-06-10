@@ -22,15 +22,15 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 1: ...` (ceca582)
 
 ## Phase 2 — Ingestion (1.5 h)
-- [ ] `src/sources/__init__.py` exporting `fetch_all`
-- [ ] `src/sources/gdelt.py`: `fetch_gdelt(...)` — defensive JSON parse, `seendate` → UTC datetime, `snippet=""`, 5s sleep between queries (probe finding: GDELT enforces 1 req/5s, not the 0.5s in the original plan)
-- [ ] `src/sources/google_news.py`: `fetch_google_news(...)` — feedparser, `source.title` as source name, strip HTML from summary
-- [ ] `src/sources/rss_feeds.py`: ONLY if Phase 0 probe confirmed live feeds; otherwise README mention only
-- [ ] `fetch_all(timespan)`: concat, assign `article_id` (uuid4 hex[:12]), drop empty title/url rows
-- [ ] Acceptance: live run returns combined DataFrame with >0 rows and correct columns
-- [ ] Acceptance: network failure → empty DataFrame, no exception
-- [ ] Acceptance: dates are timezone-aware UTC
-- [ ] Commit `phase 2: ...`
+- [x] `src/sources/__init__.py` exporting `fetch_all`
+- [x] `src/sources/gdelt.py`: `fetch_gdelt(...)` — defensive JSON parse, `seendate` → UTC datetime, `snippet=""`, 10s sleep between queries (Phase 2 finding: GDELT 429s even at 8s spacing under sustained use; partial results are normal and handled gracefully)
+- [x] `src/sources/google_news.py`: `fetch_google_news(...)` — feedparser, `source.title` as source name, strip HTML from summary
+- [x] `src/sources/rss_feeds.py`: built for the 3 feeds the probe confirmed alive (prnewswire-consumer, globenewswire-ma, globenewswire-consumer); Business Wire dead → README mention only
+- [x] `fetch_all(timespan)`: concat, assign `article_id` (uuid4 hex[:12]), drop empty title/url rows
+- [x] Acceptance: live run returns combined DataFrame with >0 rows and correct columns (385 rows: 250 google_news, 75 gdelt, 60 pr_wire)
+- [x] Acceptance: network failure → empty DataFrame, no exception (verified per-connector with unreachable hosts)
+- [x] Acceptance: dates are timezone-aware UTC (385/385)
+- [x] Commit `phase 2: ...` (5dd9509)
 
 ## Phase 3 — Cleaning & sample data (1 h)
 - [ ] `src/cleaning.py`: `canonicalize_url`, `normalize_title`, `extract_domain`, `clean_snippet`, `apply_cleaning`
