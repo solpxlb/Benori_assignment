@@ -11,40 +11,19 @@ with reasons. Canonical selection prefers higher credibility tier, then longer
 snippet, then newer date.
 """
 
-import functools
-from pathlib import Path
-
 import pandas as pd
-import yaml
 from rapidfuzz import fuzz
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.config import (DEDUPE_FUZZY_THRESHOLD, DEDUPE_TFIDF_THRESHOLD,
                         DEDUPE_DATE_WINDOW_DAYS)
-
-TIERS_YAML = Path(__file__).resolve().parent.parent / "data" / "credibility_tiers.yaml"
-
-
-@functools.lru_cache(maxsize=1)
-def _load_tiers(path: str = str(TIERS_YAML)) -> dict:
-    """Load and cache the credibility tiers YAML."""
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+from src.scoring import get_tier as _get_tier_full
 
 
 def get_tier(domain: str) -> int:
-    """Lightweight domain -> tier lookup for canonical selection.
-
-    Phase 5 owns the full credibility model (incl. name-based matching for Google
-    News rows); this stub only needs enough to rank rows within a dupe group.
-    """
-    tiers = _load_tiers()
-    domain = (domain or "").lower()
-    for tier_no in (1, 2, 3):
-        if domain in tiers.get(f"tier_{tier_no}", {}).get("domains", []):
-            return tier_no
-    return tiers.get("default_tier", 4)
+    """Domain -> tier number for canonical selection (delegates to scoring)."""
+    return _get_tier_full(domain)[0]
 
 
 def _preference_order(df: pd.DataFrame, indices: list) -> list:
