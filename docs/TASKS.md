@@ -51,16 +51,16 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 4: ...` (91f733f)
 
 ## Phase 5 — Relevance & credibility scoring (1.5 h)
-- [ ] `src/scoring.py`: `score_relevance(row)` — additive weights table per spec with reason codes, penalties, no-deal-term cap at 30
-- [ ] Classification: ≥70 include, 55–69 watchlist, <55 reject → `status`
-- [ ] `get_tier(domain, source_name)`: domain first, then case-insensitive name match (Google News rows), cached YAML
-- [ ] `score_credibility(row)`: tier base, +5 date+name present, −10 no date, clamp 0–100
-- [ ] Cluster credibility: `0.60·max + 0.25·avg_top3 + corroboration_bonus` (cap 100); document single-source quirk
-- [ ] Confidence label rules (High/Medium/Low)
-- [ ] Acceptance: sample acquisition ≥70 with correct reasons; earnings <55 with `earnings_noise`
-- [ ] Acceptance: bank merger rejected (if it sneaks through, add "no FMCG signal → cap 50" and document)
-- [ ] Acceptance: reuters.com → tier 1/90; unknownblog.net → tier 4/45; name "Reuters" → tier 1
-- [ ] Commit `phase 5: ...`
+- [x] `src/scoring.py`: `score_relevance(row)` — additive weights table per spec with reason codes, penalties, no-deal-term cap at 30 (all weights as commented module constants; word-boundary regex matching; targeted query families = food_beverage / beauty_personal_care / pe_funding)
+- [x] Classification: ≥70 include, 55–69 watchlist, <55 reject → `status` (`score_articles` scores everything incl. duplicates so Transparency can show reasons)
+- [x] `get_tier(domain, source_name)`: domain first, then case-insensitive name match (Google News rows), cached YAML — dedupe's stub now delegates here (single loader)
+- [x] `score_credibility(row)`: tier base, +5 date+name present, −10 no date, clamp 0–100
+- [x] Cluster credibility: `0.60·max + 0.25·avg_top3 + corroboration_bonus` (cap 100); single-source quirk documented in docstring (lone Reuters 90 → 76)
+- [x] Confidence label rules (High/Medium/Low)
+- [x] Acceptance: sample acquisition 75 `[strong_deal_term, fmcg_term, recent_7d, deal_value_visible]`; earnings 0 with `earnings_noise`
+- [x] Acceptance: bank merger rejected at 35 (strong term + recency only — no FMCG/category signal; contingency cap rule not needed)
+- [x] Acceptance: reuters.com → (1, 90); unknownblog.net → (4, 45); name "Reuters" on foreign domain → tier 1 (case-insensitive); sample PR row tier_3 via name fallback
+- [x] Commit `phase 5: ...` (5ee149b)
 
 ## Phase 6 — Deal clustering (1.5 h)
 - [ ] `src/clustering.py`: greedy single-pass over include/watchlist canonicals — join if dates ≤30d AND (cosine ≥0.6 OR (shared company AND cosine ≥0.4)); comment on order-dependence
