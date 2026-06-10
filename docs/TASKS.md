@@ -42,13 +42,13 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Commit `phase 3: ...` (249cf63)
 
 ## Phase 4 — Deduplication (1 h)
-- [ ] `src/dedupe.py`: 4 passes — exact URL, exact title (14d), fuzzy title ≥90 (14d), TF-IDF cosine ≥0.82 (14d, optional) — with reason codes; duplicates flagged, never deleted
-- [ ] Canonical selection: tier → longer snippet → newer date; stub `get_tier(domain)` reading YAML
-- [ ] `data/credibility_tiers.yaml` per spec (tiers 1–3 domains + names, default tier 4)
-- [ ] Acceptance: utm-variant and exact-URL dupe flagged with correct reasons
-- [ ] Acceptance: "BREAKING:" variant flagged `fuzzy_title_90` or `exact_title_14d`
-- [ ] Acceptance: canonical row is best-tier/longest-snippet; zero rows deleted; `dedupe_status` partitions cleanly
-- [ ] Commit `phase 4: ...`
+- [x] `src/dedupe.py`: 4 passes — exact URL, exact title (14d), fuzzy title ≥90 (14d), TF-IDF cosine ≥0.82 (14d, optional) — with reason codes; duplicates flagged, never deleted; duplicate_of chains resolved so every pointer targets a canonical row
+- [x] Canonical selection: tier → longer snippet → newer date; stub `get_tier(domain)` reading YAML (lru_cached; Phase 5 adds name-based matching)
+- [x] `data/credibility_tiers.yaml` per spec (tiers 1–3 domains + names, default tier 4)
+- [x] Acceptance: utm-variant and exact-URL dupe flagged with correct reasons (both `exact_url`; utm stripped by canonicalization)
+- [x] Acceptance: "BREAKING:" variant flagged — caught as `exact_url` (shares the canonical URL of article #1 by construction); the fuzzy pass is exercised by the "$120 mln" wire row → `fuzzy_title_90` (ratio 96.2)
+- [x] Acceptance: canonical row is best-tier/longest-snippet (verified: wire row beat original on snippet length and became canonical); zero rows deleted (14 in → 14 out, 3 duplicates / 11 canonical); `dedupe_status` partitions cleanly; empty/single-row frames handled
+- [x] Commit `phase 4: ...` (91f733f)
 
 ## Phase 5 — Relevance & credibility scoring (1.5 h)
 - [ ] `src/scoring.py`: `score_relevance(row)` — additive weights table per spec with reason codes, penalties, no-deal-term cap at 30
