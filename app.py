@@ -10,6 +10,7 @@ import streamlit as st
 
 from src.pipeline import PipelineResult, run_pipeline
 from src.sources import fetch_all
+from src.sources._common import filter_by_timespan
 
 
 TIMESPAN_OPTIONS = {
@@ -18,15 +19,17 @@ TIMESPAN_OPTIONS = {
     "Last 30 days": "30d",
 }
 ARCHITECTURE_PATH = Path(__file__).resolve().parent / "docs" / "architecture.mmd"
+CACHE_VERSION = 2  # bump to invalidate Streamlit Cloud cached fetch results after pipeline hotfixes
 
 
 st.set_page_config(page_title="DealLens FMCG", page_icon="DL", layout="wide")
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def cached_fetch_all(timespan: str) -> pd.DataFrame:
+def cached_fetch_all(timespan: str, cache_version: int = CACHE_VERSION) -> pd.DataFrame:
     """Cached fetch layer; sliders re-run downstream logic without refetching."""
-    return fetch_all(timespan)
+    del cache_version
+    return filter_by_timespan(fetch_all(timespan), timespan)
 
 
 def _display_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -262,7 +265,7 @@ def main() -> None:
             min_relevance=min_relevance,
             min_credibility=min_credibility,
             use_sample_fallback=use_sample_fallback,
-            fetch_func=cached_fetch_all,
+            fetch_func=lambda ts: cached_fetch_all(ts, CACHE_VERSION),
             output_dir="outputs",
         )
 
