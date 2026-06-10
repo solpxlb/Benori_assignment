@@ -22,7 +22,7 @@ from src.newsletter import generate_newsletter
 from src.sample import load_sample
 from src.scoring import score_articles
 from src.sources import fetch_all
-from src.sources._common import empty_articles_df
+from src.sources._common import empty_articles_df, filter_by_timespan
 
 
 FetchFunc = Callable[[str], pd.DataFrame]
@@ -90,7 +90,10 @@ def _filter_clusters(clusters: list[dict], min_relevance: int, min_credibility: 
     return [
         cluster for cluster in clusters
         if int(cluster.get("relevance_score") or 0) >= min_relevance
-        and int(cluster.get("credibility_score") or 0) >= min_credibility
+        and (
+            int(cluster.get("credibility_score") or 0) >= min_credibility
+            or int(cluster.get("max_article_credibility") or 0) >= min_credibility
+        )
     ]
 
 
@@ -111,6 +114,23 @@ def _timespan_label(timespan: str) -> str:
     return {"1d": "Last 24 hours", "7d": "Last 7 days", "30d": "Last 30 days"}.get(
         timespan, timespan
     )
+
+
+def _source_counts(df: pd.DataFrame) -> dict[str, int]:
+    """Return row counts by source API for run diagnostics."""
+    if df.empty or "source_api" not in df:
+        return {}
+    return {str(k): int(v) for k, v in df["source_api"].value_counts().items()}
+
+
+def _source_warning(raw_df: pd.DataFrame) -> str:
+    """Human-readable warning when source contribution is materially degraded."""
+    counts = _source_counts(raw_df)
+    if not counts:
+        return "No live source rows matched the selected date range."
+    if counts.get("gdelt", 0) == 0:
+        return "Primary source GDELT returned no rows for this run; results rely on RSS sources."
+    return ""
 
 
 def run_pipeline(
@@ -138,6 +158,7 @@ def run_pipeline(
     if live_raw_df is None:
         fetch_warning = "Fetch returned no data frame."
         live_raw_df = empty_articles_df()
+    live_raw_df = filter_by_timespan(live_raw_df, timespan)
     live_processed_df = _process_articles(live_raw_df)
     live_include_count = _included_canonical_count(live_processed_df)
 
@@ -185,6 +206,8 @@ def run_pipeline(
         "used_sample": used_sample,
         "fallback_reason": fallback_reason,
         "fetch_warning": fetch_warning,
+        "source_warning": _source_warning(live_raw_df),
+        "source_counts": _source_counts(live_raw_df),
         "live_raw_rows": len(live_raw_df),
         "raw_rows": len(raw_df),
         "processed_rows": len(processed_with_clusters),
@@ -194,6 +217,7 @@ def run_pipeline(
         if not processed_with_clusters.empty else 0,
         "cluster_count": len(clusters),
         "high_confidence_count": sum(c.get("confidence") == "High" for c in clusters),
+        "highlight_count": sum(c.get("confidence") in {"High", "Medium"} for c in clusters),
     }
 
     return PipelineResult(

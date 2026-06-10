@@ -6,7 +6,7 @@ import uuid
 import pandas as pd
 
 from src.config import GDELT_QUERIES, RSS_QUERIES
-from src.sources._common import empty_articles_df
+from src.sources._common import empty_articles_df, filter_by_timespan
 from src.sources.gdelt import fetch_gdelt
 from src.sources.google_news import fetch_google_news
 from src.sources.rss_feeds import fetch_rss_feeds
@@ -24,10 +24,13 @@ def fetch_all(timespan: str = "7d") -> pd.DataFrame:
     """
     frames = [
         fetch_gdelt(GDELT_QUERIES, timespan=timespan),
-        fetch_google_news(RSS_QUERIES),
-        fetch_rss_feeds(),
+        fetch_google_news(RSS_QUERIES, timespan=timespan),
+        fetch_rss_feeds(timespan=timespan),
     ]
     df = pd.concat(frames, ignore_index=True)
+    if df.empty:
+        return empty_articles_df()
+    df = filter_by_timespan(df, timespan)
     if df.empty:
         return empty_articles_df()
     df["article_id"] = [uuid.uuid4().hex[:12] for _ in range(len(df))]

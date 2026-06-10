@@ -1,5 +1,7 @@
 outputs/*
 !outputs/.gitkeep
+/raw_articles.json
+/raw_articles.csv
 .env
 __pycache__/
 .venv/

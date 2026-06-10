@@ -34,15 +34,26 @@ _PHRASE_STOPLIST = {
     "acquisition", "acquires", "acquired", "acquire", "merger", "merges",
     "buyout", "takeover", "divests", "divestment", "deal", "sale", "stake",
     "completes", "announces", "raises", "secures", "launches", "forms",
+    "buys", "buy", "bought", "combine", "combines", "combination",
     "explores", "exploring", "reportedly", "press", "release",
+    "lead", "leads", "led", "support", "supports", "create", "creates",
+    "debt", "financing", "facility", "billion", "million", "trillion",
+    "advises", "growth", "drive", "stock", "surges", "market", "bets",
+    "scaled", "up", "ceo", "thinks", "focused", "flavor", "mulls",
+    "gets", "candid", "transparent", "conversation", "around", "after", "reviving",
+    "remaining", "nsrgf", "labs", "sparks", "historic",
+    "weighs", "valuation", "signals", "potential", "upside",
+    "outlook", "insights", "navigator", "finance",
+    "wire", "business", "news", "statistics", "nyse", "nasdaq",
 }
 
 # Deal-type detection, first match wins in this priority order.
 _DEAL_TYPE_PRIORITY: list[tuple[str, list[str]]] = [
     ("merger", ["merger", "merges"]),
-    ("acquisition", ["acquisition", "acquires", "acquired", "buyout", "takeover"]),
+    ("acquisition", ["acquisition", "acquires", "acquired", "buy", "buys",
+                     "bought", "buyout", "takeover", "deal to buy"]),
     ("joint venture", ["joint venture"]),
-    ("divestment", ["divestment", "divests", "divestiture"]),
+    ("divestment", ["divestment", "divests", "divestiture", "sale"]),
     ("stake", ["stake sale", "stake"]),
     ("funding", ["funding", "raises"]),
     ("investment", ["investment"]),
@@ -84,6 +95,8 @@ _VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+_SOURCE_SUFFIX_RE = re.compile(r"\s+(?:-|\|)\s+.{1,45}$")
+
 
 def _strip_accents(text: str) -> str:
     """ASCII-fold accented characters (Nestlé -> Nestle) for matching."""
@@ -93,6 +106,11 @@ def _strip_accents(text: str) -> str:
 def _norm_company(name: str) -> str:
     """Normalize a company name for set comparison (case- and accent-insensitive)."""
     return _strip_accents(name).lower().strip()
+
+
+def _display_title(title: str) -> str:
+    """Remove a short publisher suffix before display-entity extraction."""
+    return _SOURCE_SUFFIX_RE.sub("", title or "").strip()
 
 
 _WATCHLIST_NORM = {}  # normalized form -> canonical display form (first wins)
@@ -123,7 +141,7 @@ def extract_companies(title: str, snippet: str = "") -> list[str]:
     for m in _WATCHLIST_RE.finditer(_strip_accents(f"{title} {snippet}")):
         add(_WATCHLIST_NORM.get(_norm_company(m.group()), m.group()))
 
-    for m in _CAP_PHRASE_RE.finditer(title or ""):
+    for m in _CAP_PHRASE_RE.finditer(_display_title(title)):
         tokens = m.group().split()
         kept = []
         for tok in tokens:
@@ -134,6 +152,57 @@ def extract_companies(title: str, snippet: str = "") -> list[str]:
             add(" ".join(kept))
 
     return found
+
+
+def _cluster_date_ok(df: pd.DataFrame, left: list, right: list) -> bool:
+    """True when all dated rows in two clusters fit inside the merge window."""
+    dates = pd.concat([df.loc[left, "published_at"], df.loc[right, "published_at"]]).dropna()
+    if dates.empty:
+        return False
+    return dates.max() - dates.min() <= pd.Timedelta(days=CLUSTER_DATE_WINDOW_DAYS)
+
+
+def _max_pair_similarity(sim, pos: dict, left: list, right: list) -> float:
+    """Maximum TF-IDF similarity between members of two clusters."""
+    if sim is None:
+        return 0.0
+    return max(float(sim[pos[a], pos[b]]) for a in left for b in right)
+
+
+def _merge_related_clusters(
+    clusters: list[dict],
+    df: pd.DataFrame,
+    comp_sets: dict,
+    sim,
+    pos: dict,
+) -> list[dict]:
+    """Conservative second pass: merge clusters sharing companies and enough text.
+
+    The first pass is intentionally greedy. This pass catches same-event coverage
+    that used different wording but shares an extracted company and has at least
+    modest title/snippet similarity inside the date window.
+    """
+    merged = [{"seed": c["seed"], "members": list(c["members"])} for c in clusters]
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(merged)):
+            if changed:
+                break
+            left_companies = set().union(*(comp_sets[idx] for idx in merged[i]["members"]))
+            for j in range(i + 1, len(merged)):
+                right_companies = set().union(*(comp_sets[idx] for idx in merged[j]["members"]))
+                if not (left_companies & right_companies):
+                    continue
+                if not _cluster_date_ok(df, merged[i]["members"], merged[j]["members"]):
+                    continue
+                if _max_pair_similarity(sim, pos, merged[i]["members"], merged[j]["members"]) < 0.25:
+                    continue
+                merged[i]["members"].extend(merged[j]["members"])
+                del merged[j]
+                changed = True
+                break
+    return merged
 
 
 def _detect_deal_type(text_lower: str) -> str:
@@ -244,6 +313,7 @@ def cluster_deals(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
                 break
         if not joined:
             clusters.append({"seed": idx, "members": [idx]})
+    clusters = _merge_related_clusters(clusters, df, comp_sets, sim, pos)
 
     records: list[dict] = []
     for n, cluster in enumerate(clusters, start=1):
@@ -286,6 +356,7 @@ def cluster_deals(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
         geography = _detect_geography(all_text)
         deal_value = _extract_deal_value(member_texts)
         relevance = int(rows["relevance_score"].max())
+        max_article_credibility = int(rows["credibility_score"].max())
         credibility = cluster_credibility(rows["credibility_score"].tolist(),
                                           source_keys, tier_labels)
         confidence = confidence_label(relevance, credibility, n_sources,
@@ -301,6 +372,7 @@ def cluster_deals(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
             "deal_value": deal_value,
             "relevance_score": relevance,
             "credibility_score": credibility,
+            "max_article_credibility": max_article_credibility,
             "confidence": confidence,
             "why_it_matters": _why_it_matters(deal_type, category, companies,
                                               geography, n_sources, deal_value),

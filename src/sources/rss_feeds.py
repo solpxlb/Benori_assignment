@@ -19,11 +19,12 @@ from src.sources.google_news import _strip_html, _parse_struct_time
 logger = logging.getLogger(__name__)
 
 
-def fetch_rss_feeds(feeds: list[dict] | None = None) -> pd.DataFrame:
+def fetch_rss_feeds(feeds: list[dict] | None = None, timespan: str = "7d") -> pd.DataFrame:
     """Fetch entries from PR-wire RSS feeds; any failing feed is skipped silently.
 
     `feeds` is a list of {"url", "source_label"} dicts (defaults to config.PR_WIRE_FEEDS).
     Returns a DataFrame with the Article column set; never raises.
+    `timespan` is accepted for connector parity; final filtering happens in fetch_all.
     """
     if feeds is None:
         feeds = PR_WIRE_FEEDS

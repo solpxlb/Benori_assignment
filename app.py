@@ -98,7 +98,7 @@ def _render_snapshot_tab(result: PipelineResult) -> None:
     c1.metric("Deal Events", meta["cluster_count"])
     c2.metric("Articles", meta["processed_rows"])
     c3.metric("Duplicates Flagged", meta["duplicate_count"])
-    c4.metric("High Confidence", meta["high_confidence_count"])
+    c4.metric("Med/High Confidence", meta.get("highlight_count", meta["high_confidence_count"]))
 
     st.markdown(result.newsletter_md)
 
@@ -269,6 +269,8 @@ def main() -> None:
     st.sidebar.success(_metadata_text(result))
     if result.run_metadata.get("fetch_warning"):
         st.sidebar.warning(result.run_metadata["fetch_warning"])
+    if result.run_metadata.get("source_warning") and not result.run_metadata["used_sample"]:
+        st.sidebar.warning(result.run_metadata["source_warning"])
     if result.run_metadata["used_sample"]:
         st.warning(
             "SAMPLE DATA mode is active. Live rows were discarded and replaced entirely with synthetic sample rows."

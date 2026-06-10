@@ -6,8 +6,12 @@ tier_1:  # base 90
 tier_2:  # base 75
   domains: [fooddive.com, just-food.com, foodbev.com, cosmeticsdesign.com, beveragedaily.com,
             retaildive.com, thegrocer.co.uk, economictimes.indiatimes.com, vccircle.com,
-            dealstreetasia.com, agfundernews.com, livemint.com, business-standard.com]
-  names: [Food Dive, Just Food, Retail Dive, The Grocer, Economic Times, Mint, VCCircle, DealStreetAsia]
+            dealstreetasia.com, agfundernews.com, livemint.com, business-standard.com,
+            insidefmcg.com.au, just-drinks.com, newfoodmagazine.com, foodnavigator.com,
+            foodnavigator-usa.com, personalcareinsights.com, globalcosmeticsnews.com]
+  names: [Food Dive, Just Food, Retail Dive, The Grocer, Economic Times, Mint, VCCircle,
+          DealStreetAsia, Inside FMCG, Just Drinks, New Food, FoodNavigator.com,
+          FoodNavigator-USA.com, Personal Care Insights, Global Cosmetics News]
 tier_3:  # base 60
   domains: [prnewswire.com, businesswire.com, globenewswire.com]
   names: [PR Newswire, Business Wire, GlobeNewswire]

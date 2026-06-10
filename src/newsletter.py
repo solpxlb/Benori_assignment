@@ -44,6 +44,11 @@ def _companies_text(value) -> str:
     return value or "Not clearly identified"
 
 
+def _md_text(value) -> str:
+    """Escape Markdown-sensitive characters in dynamic text without touching URLs."""
+    return str(value or "").replace("$", r"\$")
+
+
 def _source_count(clusters: list[dict]) -> int:
     """Count distinct source identities across clusters."""
     keys: set[str] = set()
@@ -143,18 +148,18 @@ def generate_newsletter(
 def _render_cluster_item(cluster: dict, numbered: bool = False) -> list[str]:
     """Render one cluster as markdown lines."""
     prefix = "1. " if numbered else "- "
-    companies = _companies_text(cluster.get("companies"))
+    companies = _md_text(_companies_text(cluster.get("companies")))
     meta = (
-        f"{cluster.get('deal_type', 'unknown')} | {companies} | "
-        f"{cluster.get('geography', 'Not specified')} | {cluster.get('deal_value', 'undisclosed')} | "
-        f"{cluster.get('confidence', 'Low')} confidence | "
+        f"{_md_text(cluster.get('deal_type', 'unknown'))} | {companies} | "
+        f"{_md_text(cluster.get('geography', 'Not specified'))} | {_md_text(cluster.get('deal_value', 'undisclosed'))} | "
+        f"{_md_text(cluster.get('confidence', 'Low'))} confidence | "
         f"rel {cluster.get('relevance_score', 0)} / cred {cluster.get('credibility_score', 0)} | "
         f"{cluster.get('source_count', 0)} source(s)"
     )
     lines = [
-        f"{prefix}**{cluster.get('canonical_headline', 'Untitled deal event')}**",
+        f"{prefix}**{_md_text(cluster.get('canonical_headline', 'Untitled deal event'))}**",
         f"   {meta}",
-        f"   {cluster.get('why_it_matters', '')}",
+        f"   {_md_text(cluster.get('why_it_matters', ''))}",
     ]
     links = []
     for source in cluster.get("sources", []):
@@ -168,11 +173,11 @@ def _render_cluster_item(cluster: dict, numbered: bool = False) -> list[str]:
 
 def _render_watchlist_item(cluster: dict) -> str:
     """Render one low-confidence/watchlist cluster as a compact one-liner."""
-    companies = _companies_text(cluster.get("companies"))
+    companies = _md_text(_companies_text(cluster.get("companies")))
     return (
-        f"- **{cluster.get('canonical_headline', 'Untitled deal event')}** | "
-        f"{cluster.get('deal_type', 'unknown')} | {companies} | "
-        f"{cluster.get('deal_value', 'undisclosed')} | {cluster.get('confidence', 'Low')} | "
+        f"- **{_md_text(cluster.get('canonical_headline', 'Untitled deal event'))}** | "
+        f"{_md_text(cluster.get('deal_type', 'unknown'))} | {companies} | "
+        f"{_md_text(cluster.get('deal_value', 'undisclosed'))} | {_md_text(cluster.get('confidence', 'Low'))} | "
         f"rel {cluster.get('relevance_score', 0)} / cred {cluster.get('credibility_score', 0)} | "
         f"{cluster.get('source_count', 0)} source(s)"
     )
@@ -189,7 +194,7 @@ def _render_markdown(data: dict) -> str:
         f"- {snapshot['deal_events']} deal event(s) from {snapshot['article_count']} article(s) across {snapshot['source_count']} source(s).",
         f"- Confidence mix: {snapshot['confidence_counts'] or {'Low': 0}}.",
         f"- Top categories: {', '.join(snapshot['top_categories']) if snapshot['top_categories'] else 'None'}.",
-        f"- {snapshot['auto_summary']}",
+        f"- {_md_text(snapshot['auto_summary'])}",
         "",
         "## Top Deal Highlights",
     ]
@@ -212,7 +217,7 @@ def _render_markdown(data: dict) -> str:
     lines.extend(["", "## Source Appendix"])
     if data["source_appendix"]:
         for source in data["source_appendix"]:
-            lines.append(f"- {source['cluster_id']} | {source['label']} | {source['title']} | {source['url']}")
+            lines.append(f"- {source['cluster_id']} | {_md_text(source['label'])} | {_md_text(source['title'])} | {source['url']}")
     else:
         lines.append("No cited URLs.")
     return "\n".join(lines)

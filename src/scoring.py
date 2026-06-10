@@ -30,6 +30,8 @@ W_DEAL_VALUE = 10         # a monetary deal value is visible in the text
 W_QUERY_CONTEXT = 5       # returned by a tightly-targeted query family (offsets GDELT's missing snippets)
 P_EARNINGS_NOISE = -25    # earnings/stock/dividend noise without a strong deal term
 P_LAUNCH_NOISE = -10      # product-launch/marketing noise without any deal term
+P_MARKET_NOISE = -35      # market-position articles using buy/bought language but not transactions
+P_OFF_TOPIC_SOURCE = -40   # off-topic publishers that occasionally mirror deal headlines
 NO_DEAL_TERM_CAP = 30     # hard cap when no deal term at all is present
 
 # Credibility tier base scores (tier number -> base credibility)
@@ -47,17 +49,21 @@ CORROB_OFFICIAL_MIX = 15  # a tier_1 source AND a tier_3 PR source corroborate (
 # Confidence label thresholds
 CONF_HIGH_RELEVANCE = 75  # High requires relevance >= this ...
 CONF_HIGH_CRED = 75       # ... and credibility >= this, plus >=2 domains or a tier_1 source
-CONF_MED_RELEVANCE = 65   # Medium requires relevance >= this ...
-CONF_MED_CRED = 60        # ... and credibility >= this
+CONF_MED_RELEVANCE = 60   # Medium requires relevance >= this ...
+CONF_MED_CRED = 55        # ... and credibility >= this
 
 # NEGATIVE_TERMS from config, split by which penalty they trigger:
 EARNINGS_NOISE_TERMS = ["earnings", "stock price", "share buyback", "dividend",
                         "quarterly results", "crypto", "ETF", "real estate"]
 LAUNCH_NOISE_TERMS = ["product launch", "marketing campaign"]
+MARKET_NOISE_TERMS = ["shares in", "shares of", "stock", "holdings", "position",
+                      "investors bought", "capital world investors", "marketbeat",
+                      "nyse", "nasdaq"]
+OFF_TOPIC_SOURCE_TERMS = ["crypto", "bitcoin", "blockchain"]
 
 # Query families specific enough that membership itself is a topical signal
 # (category- or thesis-targeted; compensates for GDELT artlist having no snippets).
-TARGETED_QUERY_FAMILIES = {"food_beverage", "beauty_personal_care", "pe_funding"}
+TARGETED_QUERY_FAMILIES = {"food_beverage", "beauty_personal_care", "pe_funding", "watchlist"}
 
 # Deal-value patterns: currency symbol+digit, number+magnitude word, currency code.
 DEAL_VALUE_PATTERNS = [
@@ -81,6 +87,12 @@ _CATEGORY_RE = _term_pattern(CATEGORY_TERMS)
 _WATCHLIST_RE = _term_pattern(COMPANY_WATCHLIST)
 _EARNINGS_RE = _term_pattern(EARNINGS_NOISE_TERMS)
 _LAUNCH_RE = _term_pattern(LAUNCH_NOISE_TERMS)
+_MARKET_RE = _term_pattern(MARKET_NOISE_TERMS)
+_OFF_TOPIC_SOURCE_RE = _term_pattern(OFF_TOPIC_SOURCE_TERMS)
+_TRANSACTION_RE = _term_pattern([
+    "acquisition", "merger", "merge", "takeover",
+    "joint venture", "stake sale", "remaining stake", "deal to buy",
+])
 
 # Map every query representation (family name, GDELT string, RSS string) -> family name.
 _QUERY_TO_FAMILY: dict = {}
@@ -149,6 +161,12 @@ def score_relevance(row: pd.Series) -> tuple[int, list[str]]:
     if _LAUNCH_RE.search(text) and not has_strong and not has_soft:
         score += P_LAUNCH_NOISE
         reasons.append("launch_noise")
+    if _MARKET_RE.search(text) and not _TRANSACTION_RE.search(text):
+        score += P_MARKET_NOISE
+        reasons.append("market_noise")
+    if _OFF_TOPIC_SOURCE_RE.search(str(row.get("source_name", ""))):
+        score += P_OFF_TOPIC_SOURCE
+        reasons.append("off_topic_source")
 
     if not has_strong and not has_soft:
         score = min(score, NO_DEAL_TERM_CAP)

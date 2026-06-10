@@ -4,7 +4,7 @@ DealLens FMCG generates **FMCG DealBrief**, a Streamlit industry-intelligence ne
 
 ## Demo Link + GitHub Link
 
-- Demo link: `TODO - add Streamlit Community Cloud URL after deployment`
+- Demo link: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/
 - GitHub link: https://github.com/solpxlb/Benori_assignment
 
 ## Why Deal Clustering, Not Article Summarization

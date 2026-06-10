@@ -18,8 +18,11 @@ CATEGORY_TERMS = ["food", "beverage", "dairy", "snacks", "confectionery", "packa
                   "personal care", "home care", "household products", "hygiene",
                   "cleaning products", "pet food", "baby care"]
 
-STRONG_DEAL_TERMS = ["acquisition", "acquires", "acquired", "merger", "merges",
-                     "buyout", "takeover", "joint venture", "stake sale", "divestment"]
+STRONG_DEAL_TERMS = ["acquisition", "acquires", "acquired", "buy", "buys", "bought",
+                     "merger", "merges", "combine", "combines", "combination",
+                     "buyout", "takeover", "take private", "takes private",
+                     "joint venture", "stake sale", "remaining stake", "divestment",
+                     "strike deal", "strikes deal", "struck deal", "deal to buy"]
 
 SOFT_DEAL_TERMS = ["investment", "strategic investment", "minority stake", "majority stake",
                    "stake", "funding", "raises", "private equity"]
