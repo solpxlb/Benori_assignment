@@ -39,8 +39,19 @@ NEGATIVE_TERMS = ["earnings", "stock price", "share buyback", "dividend", "quart
 
 GDELT_ENDPOINT = "https://api.gdeltproject.org/api/v2/doc/doc"  # DOC 2.0 article search
 GDELT_TIMEOUT = 10           # seconds per request; GDELT shows occasional SSL stalls
-GDELT_SLEEP_BETWEEN = 5.0    # GDELT enforces 1 req/5s; 429 penalty persists 60s+ (Phase 0 finding)
+GDELT_SLEEP_BETWEEN = 10.0   # GDELT's documented limit is 1 req/5s but enforcement is erratic; 5-8s still trips 429s, 10s is reliable (Phase 2 finding)
 MAX_RECORDS_PER_QUERY = 75   # GDELT maxrecords per query; 5 queries -> up to 375 raw rows
+
+# PR-wire RSS feeds confirmed ALIVE by the Phase 0 probe (2026-06-10). Business Wire's
+# feed was dead (HTTP 200, zero entries) and is deliberately absent — README mention only.
+PR_WIRE_FEEDS: list[dict] = [
+    {"url": "https://www.prnewswire.com/rss/consumer-products-retail-latest-news/consumer-products-retail-latest-news-list.rss",
+     "source_label": "PR Newswire"},
+    {"url": "https://www.globenewswire.com/RssFeed/subjectcode/16-Mergers%20And%20Acquisitions/feedTitle/GlobeNewswire%20-%20Mergers%20and%20Acquisitions",
+     "source_label": "GlobeNewswire"},
+    {"url": "https://www.globenewswire.com/RssFeed/industry/9576-Consumer%20Products/feedTitle/GlobeNewswire%20-%20Consumer%20Products",
+     "source_label": "GlobeNewswire"},
+]
 
 # ---------------------------------------------------------------------------
 # Dedup thresholds (used in Phase 4)
