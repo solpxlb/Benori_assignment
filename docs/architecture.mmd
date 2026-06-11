@@ -3,9 +3,11 @@ flowchart TD
     B --> B1[GDELT DOC 2.0 API]
     B --> B2[Google News RSS]
     B --> B3[PR-wire RSS - optional, if feeds alive]
+    B --> B4[Optional keyed APIs: Alpha Vantage / Marketaux / NewsData / NewsAPI]
     B1 --> C[Raw Articles CSV/JSON]
     B2 --> C
     B3 --> C
+    B4 --> C
     C --> D[Cleaning: URL canonicalization + title normalization]
     D --> E[Dedup pass 1-2: exact URL + title hash]
     E --> F[Dedup pass 3-4: fuzzy title >= 90 + TF-IDF >= 0.82]
@@ -21,5 +23,5 @@ flowchart TD
     G --> M[Rejected + duplicate queue with reasons]
     K --> N[Streamlit UI]
     M --> N
-    G -. fewer than 5 canonical include rows .-> S[Sample data fallback - clearly labeled]
+    G -. only if user enables demo fallback .-> S[Synthetic sample data - clearly labeled]
     S --> D

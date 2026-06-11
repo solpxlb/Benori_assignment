@@ -247,10 +247,28 @@ def test_sample_loader_returns_fresh_sample_rows() -> None:
     sample = load_sample()
     assert len(sample) == 14
     assert sample["is_sample"].eq(True).all()
+    assert sample["url"].fillna("").eq("").all()
     published = pd.to_datetime(sample["published_at"], utc=True)
     age_days = (pd.Timestamp.now(tz="UTC") - published).dt.total_seconds() / 86400
     assert age_days.min() >= 0
     assert age_days.max() < 15
+
+
+def test_sample_newsletter_has_no_fake_source_links(tmp_path: Path) -> None:
+    """Synthetic sample output must not render fake source URLs."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path,
+    )
+    assert result.run_metadata["used_sample"] is True
+    assert result.newsletter_data["source_appendix"] == []
+    assert "example.com" not in result.newsletter_md
+    assert "example.org" not in result.newsletter_md
+    assert "example.net" not in result.newsletter_md
 
 
 def test_run_pipeline_fetch_failure_falls_back_without_mixing(tmp_path: Path) -> None:

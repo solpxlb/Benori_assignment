@@ -13,7 +13,9 @@ import pandas as pd
 import yaml
 
 from src.config import (FMCG_TERMS, CATEGORY_TERMS, STRONG_DEAL_TERMS, SOFT_DEAL_TERMS,
-                        COMPANY_WATCHLIST, QUERY_FAMILIES, INCLUDE, WATCHLIST)
+                        COMPANY_WATCHLIST, QUERY_FAMILIES, KEYED_NEWS_QUERIES,
+                        NEWSDATA_TITLE_QUERIES,
+                        INCLUDE, WATCHLIST)
 
 # ---------------------------------------------------------------------------
 # Relevance weights (additive, clamped 0-100)
@@ -27,11 +29,12 @@ W_WATCHLIST = 15          # known FMCG company from the watchlist mentioned
 W_RECENT_7D = 10          # published within 7 days
 W_RECENT_30D = 5          # published 8-30 days ago
 W_DEAL_VALUE = 10         # a monetary deal value is visible in the text
-W_QUERY_CONTEXT = 5       # returned by a tightly-targeted query family (offsets GDELT's missing snippets)
+W_QUERY_CONTEXT = 15      # returned by a tightly-targeted FMCG deal query; title/snippet still need deal/category evidence
 P_EARNINGS_NOISE = -25    # earnings/stock/dividend noise without a strong deal term
 P_LAUNCH_NOISE = -10      # product-launch/marketing noise without any deal term
 P_MARKET_NOISE = -35      # market-position articles using buy/bought language but not transactions
 P_OFF_TOPIC_SOURCE = -40   # off-topic publishers that occasionally mirror deal headlines
+P_SERVICE_NOISE = -40      # marketing/software/service deals are adjacent, not FMCG transactions
 NO_DEAL_TERM_CAP = 30     # hard cap when no deal term at all is present
 
 # Credibility tier base scores (tier number -> base credibility)
@@ -58,8 +61,17 @@ EARNINGS_NOISE_TERMS = ["earnings", "stock price", "share buyback", "dividend",
 LAUNCH_NOISE_TERMS = ["product launch", "marketing campaign"]
 MARKET_NOISE_TERMS = ["shares in", "shares of", "stock", "holdings", "position",
                       "investors bought", "capital world investors", "marketbeat",
-                      "nyse", "nasdaq"]
-OFF_TOPIC_SOURCE_TERMS = ["crypto", "bitcoin", "blockchain"]
+                      "nyse", "nasdaq", "prices", "price", "sanctions", "raises pressure",
+                      "warehouse", "property", "properties", "real estate", "stocks",
+                      "buy sell", "sell or hold"]
+OFF_TOPIC_SOURCE_TERMS = ["crypto", "bitcoin", "blockchain", "slashdot", "alltoc"]
+SERVICE_NOISE_TERMS = ["branding", "marketing", "agency", "advertising", "social video",
+                       "media brand", "market research", "playbook", "software platform",
+                       "saas", "digital partner", "enterprise marketing", "tech firm",
+                       "technology platform", "wholesale platform", "order management platform",
+                       "supplier software", "software firm"]
+FUNDING_CONTEXT_TERMS = ["funding", "round", "capital", "valuation", "backed by",
+                         "led by", "seed", "series a", "series b", "series c"]
 
 # Query families specific enough that membership itself is a topical signal
 # (category- or thesis-targeted; compensates for GDELT artlist having no snippets).
@@ -82,6 +94,9 @@ def _term_pattern(terms: list[str]) -> re.Pattern:
 
 _STRONG_RE = _term_pattern(STRONG_DEAL_TERMS)
 _SOFT_RE = _term_pattern(SOFT_DEAL_TERMS)
+_SOFT_NO_RAISES_RE = _term_pattern([t for t in SOFT_DEAL_TERMS if t != "raises"])
+_RAISES_RE = _term_pattern(["raises"])
+_FUNDING_CONTEXT_RE = _term_pattern(FUNDING_CONTEXT_TERMS)
 _FMCG_RE = _term_pattern(FMCG_TERMS)
 _CATEGORY_RE = _term_pattern(CATEGORY_TERMS)
 _WATCHLIST_RE = _term_pattern(COMPANY_WATCHLIST)
@@ -89,6 +104,7 @@ _EARNINGS_RE = _term_pattern(EARNINGS_NOISE_TERMS)
 _LAUNCH_RE = _term_pattern(LAUNCH_NOISE_TERMS)
 _MARKET_RE = _term_pattern(MARKET_NOISE_TERMS)
 _OFF_TOPIC_SOURCE_RE = _term_pattern(OFF_TOPIC_SOURCE_TERMS)
+_SERVICE_NOISE_RE = _term_pattern(SERVICE_NOISE_TERMS)
 _TRANSACTION_RE = _term_pattern([
     "acquisition", "merger", "merge", "takeover",
     "joint venture", "stake sale", "remaining stake", "deal to buy",
@@ -100,6 +116,10 @@ for _f in QUERY_FAMILIES:
     _QUERY_TO_FAMILY[_f["name"]] = _f["name"]
     _QUERY_TO_FAMILY[_f["gdelt"]] = _f["name"]
     _QUERY_TO_FAMILY[_f["rss"]] = _f["name"]
+for _q in KEYED_NEWS_QUERIES:
+    _QUERY_TO_FAMILY[_q] = "keyed_news"
+for _q in NEWSDATA_TITLE_QUERIES:
+    _QUERY_TO_FAMILY[_q] = "keyed_news"
 
 
 def query_family(query: str) -> str:
@@ -115,9 +135,12 @@ def score_relevance(row: pd.Series) -> tuple[int, list[str]]:
     """
     text = f"{row.get('title', '')} {row.get('snippet', '')}"
     score, reasons = 0, []
+    has_deal_value_visible = any(p.search(text) for p in DEAL_VALUE_PATTERNS)
 
     has_strong = bool(_STRONG_RE.search(text))
-    has_soft = bool(_SOFT_RE.search(text))
+    has_soft = bool(_SOFT_NO_RAISES_RE.search(text)) or (
+        bool(_RAISES_RE.search(text)) and (bool(_FUNDING_CONTEXT_RE.search(text)) or has_deal_value_visible)
+    )
     if has_strong:
         score += W_STRONG_DEAL
         reasons.append("strong_deal_term")
@@ -125,14 +148,18 @@ def score_relevance(row: pd.Series) -> tuple[int, list[str]]:
         score += W_SOFT_DEAL
         reasons.append("soft_deal_term")
 
-    if _FMCG_RE.search(text):
+    has_fmcg = bool(_FMCG_RE.search(text))
+    has_category = bool(_CATEGORY_RE.search(text))
+    has_watchlist = bool(_WATCHLIST_RE.search(text))
+
+    if has_fmcg:
         score += W_FMCG_TERM
         reasons.append("fmcg_term")
-    elif _CATEGORY_RE.search(text):
+    elif has_category:
         score += W_CATEGORY_TERM  # max one category bucket by design
         reasons.append("category_term")
 
-    if _WATCHLIST_RE.search(text):
+    if has_watchlist:
         score += W_WATCHLIST
         reasons.append("watchlist_company")
 
@@ -147,11 +174,14 @@ def score_relevance(row: pd.Series) -> tuple[int, list[str]]:
             score += W_RECENT_30D
             reasons.append("recent_30d")
 
-    if any(p.search(text) for p in DEAL_VALUE_PATTERNS):
+    if has_deal_value_visible:
         score += W_DEAL_VALUE
         reasons.append("deal_value_visible")
 
-    if query_family(row.get("query", "")) in TARGETED_QUERY_FAMILIES:
+    if (
+        query_family(row.get("query", "")) in TARGETED_QUERY_FAMILIES | {"keyed_news"}
+        and (has_fmcg or has_category or has_watchlist)
+    ):
         score += W_QUERY_CONTEXT
         reasons.append("source_query_context")
 
@@ -167,6 +197,9 @@ def score_relevance(row: pd.Series) -> tuple[int, list[str]]:
     if _OFF_TOPIC_SOURCE_RE.search(str(row.get("source_name", ""))):
         score += P_OFF_TOPIC_SOURCE
         reasons.append("off_topic_source")
+    if _SERVICE_NOISE_RE.search(text):
+        score += P_SERVICE_NOISE
+        reasons.append("service_noise")
 
     if not has_strong and not has_soft:
         score = min(score, NO_DEAL_TERM_CAP)

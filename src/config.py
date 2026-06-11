@@ -56,6 +56,25 @@ PR_WIRE_FEEDS: list[dict] = [
      "source_label": "GlobeNewswire"},
 ]
 
+# Optional keyed news APIs. They are additive: missing keys simply skip the connector.
+KEYED_NEWS_QUERIES: list[str] = [
+    "acquires AND (food OR beverage OR dairy OR snacks OR beauty OR cosmetics OR skincare)",
+    "acquisition AND (food OR beverage OR dairy OR snacks OR beauty OR cosmetics OR skincare)",
+    "\"private equity\" AND (food OR beverage OR dairy OR snacks OR beauty OR cosmetics OR skincare)",
+    "raises AND (beauty OR skincare OR \"consumer brand\" OR food OR beverage)",
+    "\"strategic investment\" AND (food OR beverage OR beauty OR skincare OR \"consumer goods\")",
+    "\"joint venture\" AND (food OR beverage OR dairy OR \"consumer goods\")",
+    "(Unilever OR Nestle OR PepsiCo OR \"Tata Consumer\" OR \"Hindustan Unilever\") AND (acquisition OR merger OR investment OR stake)",
+]
+
+# NewsData.io is used with title-only searches for precision; broad body search is noisy.
+NEWSDATA_TITLE_QUERIES: list[str] = [
+    "acquires food",
+    "acquisition food",
+    "acquisition beverage",
+    "acquisition beauty",
+]
+
 # ---------------------------------------------------------------------------
 # Dedup thresholds (used in Phase 4)
 # ---------------------------------------------------------------------------

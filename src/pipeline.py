@@ -129,6 +129,9 @@ def _source_warning(raw_df: pd.DataFrame) -> str:
     counts = _source_counts(raw_df)
     if not counts:
         return "No live source rows matched the selected date range."
+    keyed_sources = {"alpha_vantage", "marketaux", "newsapi", "newsdata"}
+    if counts.get("gdelt", 0) == 0 and any(counts.get(source, 0) > 0 for source in keyed_sources):
+        return ""
     if counts.get("gdelt", 0) == 0:
         return "Primary source GDELT returned no rows for this run; results rely on RSS sources."
     return ""

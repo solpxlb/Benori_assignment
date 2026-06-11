@@ -13,7 +13,7 @@ Business readers do not need five versions of the same acquisition headline. The
 
 ## Source Strategy
 
-Primary source is **GDELT DOC 2.0**, which provides broad public-web article discovery without API keys. Fallback source is **Google News RSS**, which improves demo resilience when GDELT is slow, rate-limited, or sparse. Corroboration comes from PR-wire and company-release style RSS feeds only where Phase 0 probing confirmed live feeds: PR Newswire consumer products/retail, GlobeNewswire M&A, and GlobeNewswire consumer products. Demo reliability is protected by a clearly-labeled synthetic sample fallback; when live data produces fewer than five included articles, sample mode replaces the live set entirely rather than mixing live and synthetic rows.
+Primary no-key source is **GDELT DOC 2.0**, which provides broad public-web article discovery. Google News RSS and PR-wire/company-release RSS feeds add resilience and corroboration. For stronger live coverage, the app can also use optional keyed sources: Alpha Vantage News Sentiment, Marketaux, NewsData.io, and NewsAPI. When keyed sources are configured, GDELT is skipped by default to avoid rate-limit delays; set `DEALLENS_ENABLE_GDELT=1` to include it. Demo reliability is protected by a clearly labeled synthetic sample mode, but live scans do **not** fall back to sample data by default.
 
 ## Architecture
 
@@ -23,9 +23,11 @@ flowchart TD
     B --> B1[GDELT DOC 2.0 API]
     B --> B2[Google News RSS]
     B --> B3[PR-wire RSS - optional, if feeds alive]
+    B --> B4[Optional keyed APIs: Alpha Vantage / Marketaux / NewsData / NewsAPI]
     B1 --> C[Raw Articles CSV/JSON]
     B2 --> C
     B3 --> C
+    B4 --> C
     C --> D[Cleaning: URL canonicalization + title normalization]
     D --> E[Dedup pass 1-2: exact URL + title hash]
     E --> F[Dedup pass 3-4: fuzzy title >= 90 + TF-IDF >= 0.82]
@@ -41,7 +43,7 @@ flowchart TD
     G --> M[Rejected + duplicate queue with reasons]
     K --> N[Streamlit UI]
     M --> N
-    G -. fewer than 5 canonical include rows .-> S[Sample data fallback - clearly labeled]
+    G -. optional explicit demo fallback .-> S[Synthetic sample data - clearly labeled]
     S --> D
 ```
 
@@ -49,7 +51,7 @@ The same source is stored in [`docs/architecture.mmd`](docs/architecture.mmd).
 
 ## Pipeline Walkthrough
 
-**Ingestion:** The app fetches from GDELT, Google News RSS, and the confirmed-live PR-wire RSS feeds. Every network call has a 10-second timeout and returns an empty DataFrame/list on failure instead of crashing the app.
+**Ingestion:** The app fetches from GDELT, Google News RSS, confirmed-live PR-wire RSS feeds, and optional keyed APIs when their environment variables are configured. Every network call has a 10-second timeout and returns an empty DataFrame/list on failure instead of crashing the app. The Source health panel shows which connectors contributed rows in each live run.
 
 **Cleaning:** Raw rows are normalized into a shared article schema. URLs are canonicalized by stripping fragments and tracking parameters, and titles are normalized by removing source suffixes and noise prefixes such as "BREAKING:".
 
@@ -59,7 +61,7 @@ The same source is stored in [`docs/architecture.mmd`](docs/architecture.mmd).
 
 **Credibility Scoring:** Every row receives a credibility tier and score based on source identity and metadata completeness. Cluster credibility then adds corroboration signals across independent sources.
 
-**Sample Fallback:** The fallback check happens after live rows are cleaned, deduped, and scored. If fewer than five canonical rows are classified as `include`, the live set is discarded and the sample set is processed from the beginning with `is_sample=True`.
+**Sample Mode:** Sample rows are synthetic demo examples. Live scans do not use sample data unless the user explicitly enables the sidebar fallback option. Sample and live rows are never mixed.
 
 **Clustering:** Canonical include/watchlist rows that pass the sidebar thresholds are greedily grouped into deal events using TF-IDF similarity, date windows, and extracted company overlap. One cluster represents one transaction event.
 
@@ -132,7 +134,18 @@ To run tests after installation:
 python -m pytest -q
 ```
 
-The app needs no API keys. With no internet or sparse live data, keep "Use sample fallback" enabled and run the pipeline.
+The app works with no API keys, but live coverage is stronger when optional API keys are configured. Without keys, it uses GDELT, Google News RSS, and PR-wire RSS only.
+
+Optional live-news keys:
+
+```bash
+export ALPHAVANTAGE_API_KEY="<your-key>"
+export MARKETAUX_API_TOKEN="<your-token>"
+export NEWSDATA_API_KEY="<your-key>"
+export NEWSAPI_API_KEY="<your-key>"
+```
+
+On Streamlit Community Cloud, add the same names under app secrets. `GOOGLE_NEWS_API_KEY` is accepted as an alias for the NewsData key. Keep synthetic sample fallback off when you want strictly live output.
 
 Optional AI-polished wording uses OpenRouter only when a key is configured:
 

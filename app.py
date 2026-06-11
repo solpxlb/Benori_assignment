@@ -330,7 +330,11 @@ def _render_sidebar(api_key_available: bool) -> tuple[str, int, int, bool, bool,
     st.sidebar.markdown("**Choose a run type**")
     sample_clicked = st.sidebar.button("Preview with sample data", type="primary", width="stretch")
     live_clicked = st.sidebar.button("Scan live public news", width="stretch")
-    use_sample_fallback = st.sidebar.checkbox("Fallback to sample if live scan is sparse", value=True)
+    use_sample_fallback = st.sidebar.checkbox(
+        "Show synthetic sample if live scan is sparse",
+        value=False,
+        help="Off by default for real live scans. Turn on only when you want a demo fallback instead of sparse/empty live results.",
+    )
     use_ai_polish = st.sidebar.checkbox(
         "AI-polish newsletter wording",
         value=False,
@@ -390,9 +394,12 @@ def _render_value_cards() -> None:
 def _render_mode_note(result: PipelineResult) -> None:
     """Show one concise note about the current data mode."""
     if result.run_metadata["used_sample"]:
-        text = "You are viewing synthetic sample data so the demo is fast and reproducible. Use Scan live public news when you want current public-source results."
+        if result.run_metadata.get("fallback_reason"):
+            text = "Live scanning was sparse, so the app is showing synthetic sample data because the fallback option was enabled. These are not real news articles."
+        else:
+            text = "You are viewing synthetic sample data so the demo is fast and reproducible. Use Scan live public news when you want current public-source results."
     else:
-        text = "You are viewing live public-source results. If sources are sparse or slow, the app can fall back to a clearly labeled sample run."
+        text = "You are viewing live public-source results. Sparse runs may show few or no clusters instead of synthetic sample data."
     st.markdown(f'<div class="dl-mode-note">{text}</div>', unsafe_allow_html=True)
     if result.run_metadata.get("use_ai_polish"):
         if result.run_metadata.get("ai_polish_used"):
@@ -406,11 +413,30 @@ def _render_sample_banner(result: PipelineResult) -> None:
     if not result.run_metadata["used_sample"]:
         return
     st.markdown(
-        '<div class="dl-sample-banner">SAMPLE DATA mode is active. Sample rows are synthetic and clearly labeled in exports.</div>',
+        '<div class="dl-sample-banner">SAMPLE DATA mode is active. Rows are synthetic demo examples, not real news articles or real source links.</div>',
         unsafe_allow_html=True,
     )
     if result.run_metadata.get("fallback_reason"):
         st.caption(result.run_metadata["fallback_reason"])
+
+
+def _render_source_health(result: PipelineResult) -> None:
+    """Show connector contribution so live-data quality is auditable."""
+    meta = result.run_metadata
+    counts = meta.get("source_counts", {})
+    if meta.get("used_sample") and not meta.get("fallback_reason"):
+        return
+    with st.expander("Source health", expanded=not bool(counts)):
+        if meta.get("used_sample"):
+            st.warning("Synthetic sample output is active. Live rows, if any, were discarded because demo fallback was enabled.")
+        st.write({
+            "live_rows_after_date_filter": meta.get("live_raw_rows", 0),
+            "live_canonical_include_rows": meta.get("live_include_count", 0),
+            "displayed_clusters": meta.get("cluster_count", 0),
+            "source_rows": counts,
+        })
+        if not counts:
+            st.info("No live source rows survived the selected date window. Try Last 30 days or check API keys.")
 
 
 def _render_snapshot_tab(result: PipelineResult) -> None:
@@ -616,6 +642,7 @@ def main() -> None:
         st.sidebar.warning(result.run_metadata["source_warning"])
     _render_sample_banner(result)
     _render_mode_note(result)
+    _render_source_health(result)
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "Newsletter",

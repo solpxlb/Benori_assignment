@@ -31,7 +31,7 @@ def load_sample(csv_path: Path = SAMPLE_CSV) -> pd.DataFrame:
             "article_id": uuid.uuid4().hex[:12],
             "title": r["title"],
             "snippet": r["snippet"],
-            "url": r["url"],
+            "url": "" if pd.isna(r["url"]) else r["url"],
             "source_name": r["source_name"],
             "published_at": now - timedelta(days=int(r["days_ago"]), hours=i % 12),
             "retrieved_at": now,
