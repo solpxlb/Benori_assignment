@@ -13,9 +13,13 @@ flowchart TD
     G --> H[Credibility scoring: source tiers + corroboration]
     H --> I[Greedy deal-event clustering TF-IDF + company overlap]
     I --> J[Newsletter generator]
-    J --> K[Exports: DOCX / XLSX / JSON]
+    J --> L{AI polish enabled + key present?}
+    L -->|No| K[Exports: DOCX / XLSX / JSON]
+    L -->|Yes| O[OpenRouter polish with strict JSON + validation]
+    O -->|Valid| K
+    O -->|Invalid or timeout| K
     G --> M[Rejected + duplicate queue with reasons]
     K --> N[Streamlit UI]
     M --> N
-    F -. fewer than 5 relevant .-> S[Sample data fallback - clearly labeled]
+    G -. fewer than 5 canonical include rows .-> S[Sample data fallback - clearly labeled]
     S --> D

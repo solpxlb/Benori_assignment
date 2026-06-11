@@ -18,6 +18,7 @@ from src.cleaning import apply_cleaning
 from src.clustering import cluster_deals
 from src.dedupe import dedupe
 from src.exports import ExportArtifact, export_all
+from src.llm_newsletter import polish_newsletter
 from src.newsletter import generate_newsletter
 from src.sample import load_sample
 from src.scoring import score_articles
@@ -138,6 +139,8 @@ def run_pipeline(
     min_relevance: int = 60,
     min_credibility: int = 50,
     use_sample_fallback: bool = True,
+    use_ai_polish: bool = False,
+    openrouter_api_key: str | None = None,
     fetch_func: FetchFunc = fetch_all,
     output_dir: Path | str = "outputs",
 ) -> PipelineResult:
@@ -187,6 +190,23 @@ def run_pipeline(
         date_range_label=_timespan_label(timespan),
         is_sample=used_sample,
     )
+    ai_status = "disabled"
+    ai_warning = ""
+    ai_used = False
+    if use_ai_polish:
+        polish = polish_newsletter(
+            newsletter_data,
+            newsletter_md,
+            api_key=openrouter_api_key,
+        )
+        newsletter_md = polish.newsletter_md
+        newsletter_data = polish.newsletter_data
+        ai_status = polish.status
+        ai_warning = polish.warning
+        ai_used = polish.used_ai
+    else:
+        newsletter_data["ai_polished"] = False
+
     export_artifacts = export_all(
         raw_df,
         processed_with_clusters,
@@ -218,6 +238,10 @@ def run_pipeline(
         "cluster_count": len(clusters),
         "high_confidence_count": sum(c.get("confidence") == "High" for c in clusters),
         "highlight_count": sum(c.get("confidence") in {"High", "Medium"} for c in clusters),
+        "use_ai_polish": use_ai_polish,
+        "ai_polish_used": ai_used,
+        "ai_polish_status": ai_status,
+        "ai_polish_warning": ai_warning,
     }
 
     return PipelineResult(

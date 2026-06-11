@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from html import unescape
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import pandas as pd
+from docx import Document
 
 from src.cleaning import apply_cleaning, canonicalize_url, normalize_title
 from src.clustering import cluster_deals, extract_companies
@@ -16,6 +20,7 @@ from src.sample import load_sample
 from src.scoring import get_tier, score_articles
 from src.sources.google_news import fetch_google_news
 from src.sources._common import rows_to_df, empty_articles_df
+from src.llm_newsletter import clear_polish_cache, polish_newsletter, validate_polish
 
 
 def _row(
@@ -48,6 +53,17 @@ def _row(
 def _processed(rows: list[dict]) -> pd.DataFrame:
     """Clean, dedupe, and score test rows."""
     return score_articles(dedupe(apply_cleaning(rows_to_df(rows))))
+
+
+def _valid_ai_cluster_item(cluster: dict) -> dict:
+    """Build fact-grounded AI prose without standalone numeric claims."""
+    companies = cluster.get("companies")
+    companies_text = ", ".join(companies) if isinstance(companies, list) else str(companies or "")
+    return {
+        "cluster_id": cluster["cluster_id"],
+        "headline": f"{companies_text} {cluster['deal_type']} activity",
+        "takeaway": f"Signals {cluster['deal_type']} activity in {cluster['category']} with {companies_text}.",
+    }
 
 
 def test_canonicalize_url_strips_tracking_and_sorts_params() -> None:
@@ -356,6 +372,390 @@ def test_cluster_display_uses_article_credibility_not_only_cluster_penalty(tmp_p
     assert len(result.clusters) == 1
     assert result.clusters[0]["credibility_score"] < 50
     assert result.clusters[0]["max_article_credibility"] >= 50
+
+
+def test_ai_polish_without_key_falls_back(tmp_path: Path) -> None:
+    """AI polish is optional and deterministic output remains available with no key."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        use_ai_polish=True,
+        openrouter_api_key="",
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path,
+    )
+    assert result.newsletter_data["ai_polished"] is False
+    assert result.run_metadata["ai_polish_used"] is False
+    assert result.run_metadata["ai_polish_status"] == "disabled"
+    assert "FMCG DealBrief" in result.newsletter_md
+
+
+def test_ai_polish_rejects_unknown_cluster_id() -> None:
+    """Validation rejects model output that does not preserve cluster IDs."""
+    _, newsletter_data = generate_newsletter([], empty_articles_df(), is_sample=True)
+    newsletter_data["highlights"] = [{
+        "cluster_id": "C001",
+        "canonical_headline": "Example Foods acquires Sample Snacks Co",
+        "deal_type": "acquisition",
+        "companies": ["Example Foods", "Sample Snacks Co"],
+        "category": "Snacks & Packaged Foods",
+        "geography": "Not specified",
+        "deal_value": "undisclosed",
+        "confidence": "Medium",
+        "relevance_score": 80,
+        "credibility_score": 68,
+        "source_count": 2,
+        "why_it_matters": "Signals acquisition activity in Snacks & Packaged Foods.",
+    }]
+    newsletter_data["watchlist"] = []
+    ok, reason = validate_polish(
+        {
+            "executive_summary": "One acquisition cluster is included.",
+            "clusters": [{"cluster_id": "C999", "headline": "Example deal", "takeaway": "Uses provided facts."}],
+        },
+        newsletter_data,
+    )
+    assert ok is False
+    assert "unknown cluster_id" in reason
+
+
+def test_ai_polish_rejects_new_money_values() -> None:
+    """Validation rejects unsupported monetary claims introduced by the model."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+    )
+    polished = {
+        "executive_summary": "Sample deal activity is concentrated in packaged foods.",
+        "clusters": [
+            {
+                "cluster_id": cluster["cluster_id"],
+                "headline": cluster["canonical_headline"],
+                "takeaway": "This deal is worth $999 million.",
+            }
+            for cluster in result.newsletter_data["highlights"] + result.newsletter_data["watchlist"]
+        ],
+    }
+    ok, reason = validate_polish(polished, result.newsletter_data)
+    assert ok is False
+    assert "unsupported money value" in reason
+
+
+def test_ai_polish_mock_success(monkeypatch, tmp_path: Path) -> None:
+    """A valid mocked OpenRouter response replaces display prose and remains exportable."""
+    clear_polish_cache()
+    base = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path,
+    )
+    clusters = base.newsletter_data["highlights"] + base.newsletter_data["watchlist"]
+    content = {
+        "executive_summary": "Sample FMCG deal activity is led by packaged foods, with beauty and dairy items on watch.",
+        "clusters": [_valid_ai_cluster_item(cluster) for cluster in clusters],
+    }
+
+    class Response:
+        """Minimal requests.Response stand-in."""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": __import__("json").dumps(content)}}]}
+
+    monkeypatch.setattr("src.llm_newsletter.requests.post", lambda *args, **kwargs: Response())
+    polished = polish_newsletter(base.newsletter_data, base.newsletter_md, api_key="test-key")
+    assert polished.used_ai is True
+    assert polished.newsletter_data["ai_polished"] is True
+    assert "AI-polished wording" in polished.newsletter_md
+
+
+def test_ai_polish_mock_success_flows_to_pipeline_exports(monkeypatch, tmp_path: Path) -> None:
+    """Validated AI prose is used by markdown, DOCX, and XLSX exports."""
+    clear_polish_cache()
+    base = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path / "base",
+    )
+    clusters = base.newsletter_data["highlights"] + base.newsletter_data["watchlist"]
+    first_item = _valid_ai_cluster_item(clusters[0])
+    polished_headline = first_item["headline"]
+    polished_takeaway = first_item["takeaway"]
+    content = {
+        "executive_summary": "Sample FMCG deal activity is concentrated in packaged foods.",
+        "clusters": [
+            first_item if index == 0 else _valid_ai_cluster_item(cluster)
+            for index, cluster in enumerate(clusters)
+        ],
+    }
+
+    class Response:
+        """Minimal requests.Response stand-in."""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": __import__("json").dumps(content)}}]}
+
+    monkeypatch.setattr("src.llm_newsletter.requests.post", lambda *args, **kwargs: Response())
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        use_ai_polish=True,
+        openrouter_api_key="test-key",
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path / "polished",
+    )
+    assert result.run_metadata["ai_polish_used"] is True
+    assert "AI-polished wording" in result.newsletter_md
+    assert polished_headline in result.newsletter_md
+    assert polished_takeaway in result.newsletter_md
+
+    doc = Document(BytesIO(result.export_bytes["newsletter_docx"]))
+    doc_text = "\n".join(p.text for p in doc.paragraphs)
+    assert "AI-polished wording" in doc_text
+    assert content["executive_summary"] in doc_text
+    assert polished_headline in doc_text
+    assert polished_takeaway in doc_text
+
+    with ZipFile(BytesIO(result.export_bytes["newsletter_xlsx"])) as workbook:
+        shared_strings = unescape(workbook.read("xl/sharedStrings.xml").decode("utf-8"))
+    assert "AI polished" in shared_strings
+    assert "Gemini" not in shared_strings
+    assert "google/gemini-3.5-flash" in shared_strings
+    assert polished_headline in shared_strings
+    assert polished_takeaway in shared_strings
+
+
+def test_ai_polish_reuses_cache_for_same_input(monkeypatch, tmp_path: Path) -> None:
+    """Identical newsletter inputs should not call OpenRouter more than once."""
+    clear_polish_cache()
+    base = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path,
+    )
+    clusters = base.newsletter_data["highlights"] + base.newsletter_data["watchlist"]
+    content = {
+        "executive_summary": "Sample FMCG deal activity is concentrated in packaged foods.",
+        "clusters": [_valid_ai_cluster_item(cluster) for cluster in clusters],
+    }
+    calls = {"count": 0}
+
+    class Response:
+        """Minimal requests.Response stand-in."""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": __import__("json").dumps(content)}}]}
+
+    def fake_post(*args, **kwargs) -> Response:
+        calls["count"] += 1
+        return Response()
+
+    monkeypatch.setattr("src.llm_newsletter.requests.post", fake_post)
+    first = polish_newsletter(base.newsletter_data, base.newsletter_md, api_key="cache-test-key")
+    second = polish_newsletter(base.newsletter_data, base.newsletter_md, api_key="cache-test-key")
+    assert calls["count"] == 1
+    assert first.used_ai is True
+    assert second.used_ai is True
+    assert first.newsletter_md == second.newsletter_md
+
+
+def test_ai_polish_cache_survives_full_pipeline_rerun_timestamp(monkeypatch, tmp_path: Path) -> None:
+    """Pipeline reruns with fresh timestamps should reuse the same validated polish."""
+    base = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path / "base",
+    )
+    clusters = base.newsletter_data["highlights"] + base.newsletter_data["watchlist"]
+    content = {
+        "executive_summary": "Sample FMCG deal activity is concentrated in packaged foods.",
+        "clusters": [_valid_ai_cluster_item(cluster) for cluster in clusters],
+    }
+    calls = {"count": 0}
+    clear_polish_cache()
+
+    class Response:
+        """Minimal requests.Response stand-in."""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": __import__("json").dumps(content)}}]}
+
+    def fake_post(*args, **kwargs) -> Response:
+        calls["count"] += 1
+        return Response()
+
+    monkeypatch.setattr("src.llm_newsletter.requests.post", fake_post)
+    first = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        use_ai_polish=True,
+        openrouter_api_key="pipeline-cache-key",
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path / "first",
+    )
+    second = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        use_ai_polish=True,
+        openrouter_api_key="pipeline-cache-key",
+        fetch_func=lambda _: empty_articles_df(),
+        output_dir=tmp_path / "second",
+    )
+    assert calls["count"] == 1
+    assert first.run_metadata["ai_polish_used"] is True
+    assert second.run_metadata["ai_polish_used"] is True
+    assert first.newsletter_data["run_timestamp"] != ""
+    assert second.newsletter_data["run_timestamp"] != ""
+
+
+def test_ai_polish_malformed_json_falls_back(monkeypatch) -> None:
+    """Malformed OpenRouter output never replaces deterministic newsletter content."""
+    clear_polish_cache()
+    base = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+    )
+
+    class Response:
+        """Minimal malformed response stand-in."""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": "not json"}}]}
+
+    monkeypatch.setattr("src.llm_newsletter.requests.post", lambda *args, **kwargs: Response())
+    polished = polish_newsletter(base.newsletter_data, base.newsletter_md, api_key="test-key")
+    assert polished.used_ai is False
+    assert polished.status == "fallback"
+    assert polished.newsletter_md == base.newsletter_md
+
+
+def test_ai_polish_rejects_new_entity_and_geography_terms() -> None:
+    """Validation rejects company/geography-like terms that were not in cluster facts."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+    )
+    polished = {
+        "executive_summary": "Sample FMCG deal activity is concentrated in packaged foods.",
+        "clusters": [
+            {
+                "cluster_id": cluster["cluster_id"],
+                "headline": cluster["canonical_headline"],
+                "takeaway": "Brazil expansion by Omega Foods is highlighted.",
+            }
+            for cluster in result.newsletter_data["highlights"] + result.newsletter_data["watchlist"]
+        ],
+    }
+    ok, reason = validate_polish(polished, result.newsletter_data)
+    assert ok is False
+    assert "unsupported term" in reason
+
+
+def test_ai_polish_rejects_links_dates_and_percentages() -> None:
+    """Validation rejects model-created links, dates, and percentages."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+    )
+    clusters = result.newsletter_data["highlights"] + result.newsletter_data["watchlist"]
+
+    def output_with(takeaway: str) -> dict:
+        return {
+            "executive_summary": "Sample FMCG deal activity is concentrated in packaged foods.",
+            "clusters": [
+                {
+                    "cluster_id": cluster["cluster_id"],
+                    "headline": cluster["canonical_headline"],
+                    "takeaway": takeaway if index == 0 else cluster["why_it_matters"],
+                }
+                for index, cluster in enumerate(clusters)
+            ],
+        }
+
+    ok, reason = validate_polish(output_with("Read more at https://example.com."), result.newsletter_data)
+    assert ok is False
+    assert "link-like text" in reason
+
+    ok, reason = validate_polish(output_with("Expected to close in January 2027."), result.newsletter_data)
+    assert ok is False
+    assert "unsupported date" in reason
+
+    ok, reason = validate_polish(output_with("Management expects a 25% margin lift."), result.newsletter_data)
+    assert ok is False
+    assert "unsupported date or percentage" in reason
+
+
+def test_ai_polish_rejects_unsupported_plain_numbers() -> None:
+    """Validation rejects numeric claims not present in the deterministic input."""
+    result = run_pipeline(
+        "7d",
+        60,
+        50,
+        True,
+        fetch_func=lambda _: empty_articles_df(),
+    )
+    clusters = result.newsletter_data["highlights"] + result.newsletter_data["watchlist"]
+    existing_score = int(clusters[0]["relevance_score"])
+    polished = {
+        "executive_summary": f"Sample FMCG deal activity includes {existing_score} source signals.",
+        "clusters": [
+            {
+                "cluster_id": cluster["cluster_id"],
+                "headline": cluster["canonical_headline"],
+                "takeaway": cluster["why_it_matters"],
+            }
+            for cluster in clusters
+        ],
+    }
+    ok, reason = validate_polish(polished, result.newsletter_data)
+    assert ok is False
+    assert "unsupported number" in reason
 
 
 def test_company_extraction_filters_headline_action_junk() -> None:

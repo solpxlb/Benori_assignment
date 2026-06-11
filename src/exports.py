@@ -100,8 +100,11 @@ def export_newsletter_docx(newsletter: dict, output_dir: Path | str,
     out = _ensure_dir(output_dir)
     doc = Document()
     doc.add_heading(newsletter["title"], level=0)
+    mode = newsletter["data_mode"]
+    if newsletter.get("ai_polished"):
+        mode += " | AI-polished wording"
     doc.add_paragraph(
-        f"{newsletter['data_mode']} | {newsletter['date_range']} | Run: {newsletter['run_timestamp']}"
+        f"{mode} | {newsletter['date_range']} | Run: {newsletter['run_timestamp']}"
     )
 
     snapshot = newsletter["snapshot"]
@@ -110,7 +113,7 @@ def export_newsletter_docx(newsletter: dict, output_dir: Path | str,
         f"{snapshot['deal_events']} deal event(s) from {snapshot['article_count']} article(s) across {snapshot['source_count']} source(s).",
         f"Confidence mix: {snapshot['confidence_counts'] or {'Low': 0}}.",
         f"Top categories: {', '.join(snapshot['top_categories']) if snapshot['top_categories'] else 'None'}.",
-        snapshot["auto_summary"],
+        newsletter.get("ai_executive_summary") or snapshot["auto_summary"],
     ]:
         doc.add_paragraph(text, style="List Bullet")
 
@@ -148,7 +151,7 @@ def _add_cluster_section(doc: Document, clusters: list[dict], fallback: str) -> 
         return
     for cluster in clusters:
         p = doc.add_paragraph()
-        p.add_run(cluster.get("canonical_headline", "Untitled deal event")).bold = True
+        p.add_run(_cluster_headline(cluster)).bold = True
         companies = cluster.get("companies")
         companies_text = ", ".join(companies) if isinstance(companies, list) else (companies or "Not clearly identified")
         doc.add_paragraph(
@@ -158,7 +161,7 @@ def _add_cluster_section(doc: Document, clusters: list[dict], fallback: str) -> 
             f"rel {cluster.get('relevance_score', 0)} / cred {cluster.get('credibility_score', 0)} | "
             f"{cluster.get('source_count', 0)} source(s)"
         )
-        doc.add_paragraph(cluster.get("why_it_matters", ""))
+        doc.add_paragraph(_cluster_takeaway(cluster))
         for source in cluster.get("sources", []):
             doc.add_paragraph(
                 f"{source.get('source_name') or source.get('domain') or 'source'}: "
@@ -176,13 +179,23 @@ def _add_watchlist_section(doc: Document, clusters: list[dict], fallback: str) -
         companies = cluster.get("companies")
         companies_text = ", ".join(companies) if isinstance(companies, list) else (companies or "Not clearly identified")
         doc.add_paragraph(
-            f"{cluster.get('canonical_headline', 'Untitled deal event')} | "
+            f"{_cluster_headline(cluster)} | "
             f"{cluster.get('deal_type', 'unknown')} | {companies_text} | "
             f"{cluster.get('deal_value', 'undisclosed')} | {cluster.get('confidence', 'Low')} | "
             f"rel {cluster.get('relevance_score', 0)} / cred {cluster.get('credibility_score', 0)} | "
-            f"{cluster.get('source_count', 0)} source(s)",
+            f"{cluster.get('source_count', 0)} source(s). {_cluster_takeaway(cluster)}",
             style="List Bullet",
         )
+
+
+def _cluster_headline(cluster: dict) -> str:
+    """Prefer validated AI-polished headline when present."""
+    return cluster.get("ai_headline") or cluster.get("canonical_headline", "Untitled deal event")
+
+
+def _cluster_takeaway(cluster: dict) -> str:
+    """Prefer validated AI-polished takeaway when present."""
+    return cluster.get("ai_takeaway") or cluster.get("why_it_matters", "")
 
 
 def _cell_safe(value: Any) -> Any:
@@ -210,13 +223,16 @@ def _clusters_flat(clusters: list[dict]) -> pd.DataFrame:
     for cluster in clusters:
         row = {k: v for k, v in cluster.items() if k != "sources"}
         row["companies"] = ", ".join(v for v in cluster.get("companies", []) if v) if isinstance(cluster.get("companies"), list) else cluster.get("companies", "")
+        row["display_headline"] = _cluster_headline(cluster)
+        row["display_takeaway"] = _cluster_takeaway(cluster)
         row["source_titles"] = "; ".join(s.get("title", "") for s in cluster.get("sources", []))
         rows.append(row)
     columns = [
         "cluster_id", "canonical_headline", "deal_type", "companies", "geography",
         "category", "deal_value", "relevance_score", "credibility_score",
         "confidence", "why_it_matters", "article_count", "source_count",
-        "earliest_published_at", "latest_published_at", "is_sample", "source_titles",
+        "earliest_published_at", "latest_published_at", "is_sample",
+        "display_headline", "display_takeaway", "source_titles",
     ]
     return _sheet_df(rows, columns)
 
@@ -250,7 +266,7 @@ def _newsletter_rows(clusters: list[dict]) -> list[dict]:
         companies = cluster.get("companies")
         rows.append({
             "cluster_id": cluster.get("cluster_id", ""),
-            "headline": cluster.get("canonical_headline", ""),
+            "headline": _cluster_headline(cluster),
             "deal_type": cluster.get("deal_type", ""),
             "companies": ", ".join(companies) if isinstance(companies, list) else companies,
             "category": cluster.get("category", ""),
@@ -260,7 +276,7 @@ def _newsletter_rows(clusters: list[dict]) -> list[dict]:
             "relevance_score": cluster.get("relevance_score", ""),
             "credibility_score": cluster.get("credibility_score", ""),
             "source_count": cluster.get("source_count", ""),
-            "why_it_matters": cluster.get("why_it_matters", ""),
+            "why_it_matters": _cluster_takeaway(cluster),
         })
     return rows
 
@@ -285,6 +301,8 @@ def export_newsletter_xlsx(newsletter: dict, clusters: list[dict], processed_art
     snapshot = newsletter["snapshot"]
     snapshot_df = _sheet_df([
         {"metric": "Data mode", "value": newsletter["data_mode"]},
+        {"metric": "AI polished", "value": bool(newsletter.get("ai_polished"))},
+        {"metric": "AI model", "value": newsletter.get("ai_model", "")},
         {"metric": "Date range", "value": newsletter["date_range"]},
         {"metric": "Run timestamp", "value": newsletter["run_timestamp"]},
         {"metric": "Deal events", "value": snapshot["deal_events"]},
@@ -292,7 +310,7 @@ def export_newsletter_xlsx(newsletter: dict, clusters: list[dict], processed_art
         {"metric": "Unique sources", "value": snapshot["source_count"]},
         {"metric": "Confidence mix", "value": snapshot["confidence_counts"]},
         {"metric": "Top categories", "value": ", ".join(snapshot["top_categories"])},
-        {"metric": "Auto summary", "value": snapshot["auto_summary"]},
+        {"metric": "Auto summary", "value": newsletter.get("ai_executive_summary") or snapshot["auto_summary"]},
     ], ["metric", "value"])
 
     highlight_df = _sheet_df(_newsletter_rows(newsletter["highlights"]), [

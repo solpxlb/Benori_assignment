@@ -33,11 +33,15 @@ flowchart TD
     G --> H[Credibility scoring: source tiers + corroboration]
     H --> I[Greedy deal-event clustering TF-IDF + company overlap]
     I --> J[Newsletter generator]
-    J --> K[Exports: DOCX / XLSX / JSON]
+    J --> L{AI polish enabled + key present?}
+    L -->|No| K[Exports: DOCX / XLSX / JSON]
+    L -->|Yes| O[OpenRouter polish with strict JSON + validation]
+    O -->|Valid| K
+    O -->|Invalid or timeout| K
     G --> M[Rejected + duplicate queue with reasons]
     K --> N[Streamlit UI]
     M --> N
-    F -. fewer than 5 relevant .-> S[Sample data fallback - clearly labeled]
+    G -. fewer than 5 canonical include rows .-> S[Sample data fallback - clearly labeled]
     S --> D
 ```
 
@@ -60,6 +64,8 @@ The same source is stored in [`docs/architecture.mmd`](docs/architecture.mmd).
 **Clustering:** Canonical include/watchlist rows that pass the sidebar thresholds are greedily grouped into deal events using TF-IDF similarity, date windows, and extracted company overlap. One cluster represents one transaction event.
 
 **Newsletter + Exports:** Cluster records feed the FMCG DealBrief markdown, DOCX, XLSX, clusters JSON, raw CSV, and raw JSON downloads. The newsletter uses deterministic templates and does not generate unsupported claims.
+
+**Optional AI Polish:** If `OPENROUTER_API_KEY` is configured, the app can use OpenRouter's Gemini 3.5 Flash to rewrite the deterministic cluster facts into smoother prose. This is a presentation layer only: the model receives structured cluster fields, returns strict JSON, and the app rejects unknown cluster IDs, missing clusters, overlong prose, unsupported monetary/date/percentage/plain-number claims, source links, and unsupported new entity terms before using the output. Without a key or after any validation failure, the deterministic newsletter is used automatically.
 
 ## Deduplication Logic
 
@@ -128,6 +134,15 @@ python -m pytest -q
 
 The app needs no API keys. With no internet or sparse live data, keep "Use sample fallback" enabled and run the pipeline.
 
+Optional AI-polished wording uses OpenRouter only when a key is configured:
+
+```bash
+export OPENROUTER_API_KEY="<your-key>"
+streamlit run app.py
+```
+
+On Streamlit Community Cloud, add the same key under app secrets. Do not commit API keys to the repository.
+
 ## Outputs Produced
 
 - Streamlit Snapshot & Newsletter tab with FMCG DealBrief.
@@ -146,6 +161,7 @@ The app needs no API keys. With no internet or sparse live data, keep "Use sampl
 - Heuristic relevance scoring favors explainability over perfect precision; false positives and false negatives are expected.
 - Greedy clustering is order-dependent and compares articles to cluster seed rows, so borderline events can split or merge incorrectly.
 - The app uses headlines, RSS snippets, and metadata only; it does not scrape full articles, bypass paywalls, or infer facts that are not visible in fetched text.
+- Optional AI-polished wording is constrained to validated cluster facts and is labeled in the newsletter when active.
 - Deal values, company names, geographies, and dates are extracted only from visible text. Unknown values are shown as `undisclosed` or `Not specified`.
 - English-language source bias is intentional for this demo and excludes non-English coverage.
 - Google News RSS links hide publisher domains, so credibility lookup falls back to source names for those rows.

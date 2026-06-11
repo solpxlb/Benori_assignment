@@ -49,6 +49,16 @@ def _md_text(value) -> str:
     return str(value or "").replace("$", r"\$")
 
 
+def _headline(cluster: dict) -> str:
+    """Prefer validated AI-polished headline when present."""
+    return cluster.get("ai_headline") or cluster.get("canonical_headline", "Untitled deal event")
+
+
+def _takeaway(cluster: dict) -> str:
+    """Prefer validated AI-polished takeaway when present."""
+    return cluster.get("ai_takeaway") or cluster.get("why_it_matters", "")
+
+
 def _source_count(clusters: list[dict]) -> int:
     """Count distinct source identities across clusters."""
     keys: set[str] = set()
@@ -157,9 +167,9 @@ def _render_cluster_item(cluster: dict, numbered: bool = False) -> list[str]:
         f"{cluster.get('source_count', 0)} source(s)"
     )
     lines = [
-        f"{prefix}**{_md_text(cluster.get('canonical_headline', 'Untitled deal event'))}**",
+        f"{prefix}**{_md_text(_headline(cluster))}**",
         f"   {meta}",
-        f"   {_md_text(cluster.get('why_it_matters', ''))}",
+        f"   {_md_text(_takeaway(cluster))}",
     ]
     links = []
     for source in cluster.get("sources", []):
@@ -175,26 +185,29 @@ def _render_watchlist_item(cluster: dict) -> str:
     """Render one low-confidence/watchlist cluster as a compact one-liner."""
     companies = _md_text(_companies_text(cluster.get("companies")))
     return (
-        f"- **{_md_text(cluster.get('canonical_headline', 'Untitled deal event'))}** | "
+        f"- **{_md_text(_headline(cluster))}** | "
         f"{_md_text(cluster.get('deal_type', 'unknown'))} | {companies} | "
         f"{_md_text(cluster.get('deal_value', 'undisclosed'))} | {_md_text(cluster.get('confidence', 'Low'))} | "
         f"rel {cluster.get('relevance_score', 0)} / cred {cluster.get('credibility_score', 0)} | "
-        f"{cluster.get('source_count', 0)} source(s)"
+        f"{cluster.get('source_count', 0)} source(s). {_md_text(_takeaway(cluster))}"
     )
 
 
-def _render_markdown(data: dict) -> str:
+def render_newsletter_markdown(data: dict) -> str:
     """Render structured newsletter data into Streamlit-friendly markdown."""
     snapshot = data["snapshot"]
+    mode_badge = data["data_mode"]
+    if data.get("ai_polished"):
+        mode_badge += " | AI-polished wording"
     lines = [
         f"# {data['title']}",
-        f"**{data['data_mode']}** | {data['date_range']} | Run: {data['run_timestamp']}",
+        f"**{mode_badge}** | {data['date_range']} | Run: {data['run_timestamp']}",
         "",
         "## Executive Snapshot",
         f"- {snapshot['deal_events']} deal event(s) from {snapshot['article_count']} article(s) across {snapshot['source_count']} source(s).",
         f"- Confidence mix: {snapshot['confidence_counts'] or {'Low': 0}}.",
         f"- Top categories: {', '.join(snapshot['top_categories']) if snapshot['top_categories'] else 'None'}.",
-        f"- {_md_text(snapshot['auto_summary'])}",
+        f"- {_md_text(data.get('ai_executive_summary') or snapshot['auto_summary'])}",
         "",
         "## Top Deal Highlights",
     ]
@@ -221,3 +234,8 @@ def _render_markdown(data: dict) -> str:
     else:
         lines.append("No cited URLs.")
     return "\n".join(lines)
+
+
+def _render_markdown(data: dict) -> str:
+    """Backward-compatible wrapper for existing callers."""
+    return render_newsletter_markdown(data)

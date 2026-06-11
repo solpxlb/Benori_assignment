@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -230,13 +231,30 @@ def cached_fetch_all(timespan: str, cache_version: int = CACHE_VERSION) -> pd.Da
     return filter_by_timespan(fetch_all(timespan), timespan)
 
 
-def _sample_result(timespan: str, min_relevance: int, min_credibility: int) -> PipelineResult:
+def _openrouter_api_key() -> str:
+    """Read OpenRouter API key from Streamlit secrets or environment."""
+    try:
+        secret_value = st.secrets.get("OPENROUTER_API_KEY", "")
+    except Exception:
+        secret_value = ""
+    return str(secret_value or os.environ.get("OPENROUTER_API_KEY", "")).strip()
+
+
+def _sample_result(
+    timespan: str,
+    min_relevance: int,
+    min_credibility: int,
+    use_ai_polish: bool,
+    openrouter_api_key: str,
+) -> PipelineResult:
     """Fast sample run used for the initial product demo."""
     result = run_pipeline(
         timespan=timespan,
         min_relevance=min_relevance,
         min_credibility=min_credibility,
         use_sample_fallback=True,
+        use_ai_polish=use_ai_polish,
+        openrouter_api_key=openrouter_api_key,
         fetch_func=lambda _: empty_articles_df(),
         output_dir="outputs",
     )
@@ -294,7 +312,7 @@ def _metadata_text(result: PipelineResult) -> str:
     )
 
 
-def _render_sidebar() -> tuple[str, int, int, bool, str | None]:
+def _render_sidebar(api_key_available: bool) -> tuple[str, int, int, bool, bool, str | None]:
     """Render sidebar controls and return selected values."""
     st.sidebar.title("DealLens FMCG")
     st.sidebar.caption("Generate a skim-ready FMCG deal newsletter from public news signals.")
@@ -310,13 +328,21 @@ def _render_sidebar() -> tuple[str, int, int, bool, str | None]:
         min_credibility = st.slider("Minimum credibility", 0, 100, 50, 5)
 
     st.sidebar.markdown("**Choose a run type**")
-    sample_clicked = st.sidebar.button("Preview with sample data", type="primary", use_container_width=True)
-    live_clicked = st.sidebar.button("Scan live public news", use_container_width=True)
+    sample_clicked = st.sidebar.button("Preview with sample data", type="primary", width="stretch")
+    live_clicked = st.sidebar.button("Scan live public news", width="stretch")
     use_sample_fallback = st.sidebar.checkbox("Fallback to sample if live scan is sparse", value=True)
-    st.sidebar.caption("Sample mode is instant. Live scans can take about a minute because public sources are rate-limited.")
+    use_ai_polish = st.sidebar.checkbox(
+        "AI-polish newsletter wording",
+        value=False,
+        disabled=not api_key_available,
+        help="Uses OpenRouter only to rewrite validated cluster facts. Calls time out after 10 seconds. The deterministic newsletter remains the fallback.",
+    )
+    if not api_key_available:
+        st.sidebar.caption("Set OPENROUTER_API_KEY to enable AI-polished wording.")
+    st.sidebar.caption("Sample mode is instant. Live scans can take 1-2 minutes because public sources are rate-limited.")
 
     action = RUN_MODE_SAMPLE if sample_clicked else RUN_MODE_LIVE if live_clicked else None
-    return TIMESPAN_OPTIONS[date_label], min_relevance, min_credibility, use_sample_fallback, action
+    return TIMESPAN_OPTIONS[date_label], min_relevance, min_credibility, use_sample_fallback, use_ai_polish, action
 
 
 def _render_hero(run_mode: str) -> None:
@@ -368,6 +394,11 @@ def _render_mode_note(result: PipelineResult) -> None:
     else:
         text = "You are viewing live public-source results. If sources are sparse or slow, the app can fall back to a clearly labeled sample run."
     st.markdown(f'<div class="dl-mode-note">{text}</div>', unsafe_allow_html=True)
+    if result.run_metadata.get("use_ai_polish"):
+        if result.run_metadata.get("ai_polish_used"):
+            st.caption("AI-polished wording is active. It rewrites validated cluster facts only; source links and exports remain evidence-backed.")
+        elif result.run_metadata.get("ai_polish_warning"):
+            st.caption(f"AI polish fell back to deterministic wording: {result.run_metadata['ai_polish_warning']}")
 
 
 def _render_sample_banner(result: PipelineResult) -> None:
@@ -436,7 +467,7 @@ def _render_clusters_tab(result: PipelineResult) -> None:
             st.dataframe(
                 evidence,
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
                 column_config={"URL": st.column_config.LinkColumn("URL")},
             )
 
@@ -453,7 +484,7 @@ def _render_transparency_tab(result: PipelineResult) -> None:
     st.dataframe(
         _display_df(duplicates[["title", "duplicate_of", "dedupe_reason", "source_name", "url"]]),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={"url": st.column_config.LinkColumn("URL")},
     )
 
@@ -463,7 +494,7 @@ def _render_transparency_tab(result: PipelineResult) -> None:
     st.dataframe(
         _display_df(rejected[rejected_cols]),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={"url": st.column_config.LinkColumn("URL")},
     )
 
@@ -473,7 +504,7 @@ def _render_transparency_tab(result: PipelineResult) -> None:
     if query:
         haystack = full.astype(str).agg(" ".join, axis=1)
         full = full[haystack.str.contains(query, case=False, na=False, regex=False)]
-    st.dataframe(full, hide_index=True, use_container_width=True)
+    st.dataframe(full, hide_index=True, width="stretch")
 
 
 def _render_methodology_tab() -> None:
@@ -522,6 +553,16 @@ def _render_methodology_tab() -> None:
 """
     )
 
+    st.subheader("Optional AI Polish")
+    st.markdown(
+        """
+- If `OPENROUTER_API_KEY` is configured, the app can ask OpenRouter's Gemini 3.5 Flash to rewrite validated cluster facts into smoother prose.
+- The model sees only structured cluster fields, not full articles, and must return strict JSON with the same cluster IDs.
+- The app rejects malformed output, unknown cluster IDs, missing clusters, overlong text, unsupported values, links, and standalone numeric claims.
+- If validation fails or the key is absent, the deterministic newsletter is used automatically.
+"""
+    )
+
     st.subheader("Limitations")
     st.markdown(
         """
@@ -536,7 +577,10 @@ def _render_methodology_tab() -> None:
 def main() -> None:
     """Render the Streamlit app."""
     st.markdown(APP_CSS, unsafe_allow_html=True)
-    timespan, min_relevance, min_credibility, use_sample_fallback, action = _render_sidebar()
+    openrouter_key = _openrouter_api_key()
+    timespan, min_relevance, min_credibility, use_sample_fallback, use_ai_polish, action = _render_sidebar(
+        bool(openrouter_key)
+    )
 
     if "run_mode" not in st.session_state:
         st.session_state["run_mode"] = RUN_MODE_SAMPLE
@@ -551,17 +595,19 @@ def main() -> None:
     _render_value_cards()
 
     if st.session_state["run_mode"] == RUN_MODE_LIVE:
-        with st.spinner("Scanning public sources. This can take about a minute because free news sources are rate-limited."):
+        with st.spinner("Scanning public sources. This can take 1-2 minutes because free news sources are rate-limited."):
             result = run_pipeline(
                 timespan=timespan,
                 min_relevance=min_relevance,
                 min_credibility=min_credibility,
                 use_sample_fallback=use_sample_fallback,
+                use_ai_polish=use_ai_polish,
+                openrouter_api_key=openrouter_key,
                 fetch_func=lambda ts: cached_fetch_all(ts, CACHE_VERSION),
                 output_dir="outputs",
             )
     else:
-        result = _sample_result(timespan, min_relevance, min_credibility)
+        result = _sample_result(timespan, min_relevance, min_credibility, use_ai_polish, openrouter_key)
 
     st.sidebar.success(_metadata_text(result))
     if result.run_metadata.get("fetch_warning"):
