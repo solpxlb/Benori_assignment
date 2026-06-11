@@ -214,7 +214,15 @@ def _sheet_df(records: list[dict], columns: list[str]) -> pd.DataFrame:
     for col in columns:
         if col not in df.columns:
             df[col] = ""
-    return df[columns].map(_cell_safe)
+    return _map_dataframe(df[columns], _cell_safe)
+
+
+def _map_dataframe(df: pd.DataFrame, func) -> pd.DataFrame:
+    """Apply a scalar function to a frame across pandas versions."""
+    mapper = getattr(df, "map", None)
+    if mapper is not None:
+        return mapper(func)
+    return df.applymap(func)
 
 
 def _clusters_flat(clusters: list[dict]) -> pd.DataFrame:
@@ -331,7 +339,7 @@ def export_newsletter_xlsx(newsletter: dict, clusters: list[dict], processed_art
         "Deal Clusters": _clusters_flat(clusters),
         "Article Evidence": _evidence_flat(clusters),
         "Watchlist": watchlist_df,
-        "Rejected & Duplicates": _rejected_duplicates(processed_articles).map(_cell_safe),
+        "Rejected & Duplicates": _map_dataframe(_rejected_duplicates(processed_articles), _cell_safe),
         "Methodology": methodology_df,
     }
 

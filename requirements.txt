@@ -1,5 +1,5 @@
-streamlit
-pandas
+streamlit>=1.58
+pandas>=2.1
 requests
 feedparser
 rapidfuzz
