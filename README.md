@@ -7,6 +7,23 @@ DealLens FMCG generates **FMCG DealBrief**, a Streamlit industry-intelligence ne
 - Demo link: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/
 - GitHub link: https://github.com/solpxlb/Benori_assignment
 
+## Submission Deliverables
+
+| Requirement | Where it is covered |
+|---|---|
+| Demo app link | Streamlit app: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/ |
+| GitHub source link | Public repo: https://github.com/solpxlb/Benori_assignment |
+| Architecture diagram | Mermaid diagram in this README and [`docs/architecture.mmd`](docs/architecture.mmd) |
+| Raw data in CSV/JSON | App downloads: `raw_articles.csv`, `raw_articles.json`; also written under `outputs/` for local runs |
+| Structured newsletter in Excel/Word format | App downloads: `newsletter.xlsx` and `newsletter.docx` |
+| Deal clusters / event data | App download: `deal_clusters.json`; workbook sheet: `Deal Clusters` |
+| Pipeline explanation | README sections below plus the app's Methodology tab |
+| De-duplication logic | Four-pass logic described in [Deduplication Logic](#deduplication-logic) |
+| Relevance check logic | Scoring table and thresholds described in [Relevance Scoring](#relevance-scoring) |
+| Credibility assumptions | Source tiers and corroboration formula described in [Credibility Scoring](#credibility-scoring) |
+
+For a real-data demo, add the optional news API keys in Streamlit secrets and run **Scan live public news** with synthetic sample fallback left off. Sample mode is only for offline/reproducible demos and is labeled as synthetic.
+
 ## Why Deal Clustering, Not Article Summarization
 
 Business readers do not need five versions of the same acquisition headline. They need one deal event with the best headline, corroborating sources, confidence, and evidence. Clustering also makes uncertainty visible: a single-source item is useful, but a multi-source event with an official release and independent reporting deserves higher confidence.
