@@ -106,7 +106,7 @@ Derived from PLAN.md. Work one phase at a time; do not start a phase until the p
 - [x] Local verification: `.venv/bin/python -m pytest -q` green; no-network sample smoke produced required exports
 - [x] Sub-agent audit: first pass GREEN LIGHT for docs/diagram; second pass GREEN LIGHT after raw JSON download addition
 - [x] GitHub repo created and pushed: https://github.com/solpxlb/Benori_assignment
-- [x] Streamlit app deployed: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/
+- [x] Streamlit app deployed: https://shivam-benori.streamlit.app/
 - [x] Hotfix pushed to GitHub (`12085cc`); local replay verifies sample/live quality
 - [ ] Verify redeployed app cold-start in incognito after Streamlit app access is public
 - [ ] Final acceptance: demo link works in incognito; repo has README/diagram/tests/no secrets; raw CSV/JSON downloadable; DOCX + XLSX newsletter; dedup+relevance explained in README and visible in Transparency tab; non-technical reader can skim newsletter in <2 min

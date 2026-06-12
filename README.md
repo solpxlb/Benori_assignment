@@ -4,14 +4,14 @@ DealLens FMCG generates **FMCG DealBrief**, a Streamlit industry-intelligence ne
 
 ## Demo Link + GitHub Link
 
-- Demo link: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/
+- Demo link: https://shivam-benori.streamlit.app/
 - GitHub link: https://github.com/solpxlb/Benori_assignment
 
 ## Submission Deliverables
 
 | Requirement | Where it is covered |
 |---|---|
-| Demo app link | Streamlit app: https://benoriassignment-7jukxihgx2v2nu97zfg3cs.streamlit.app/ |
+| Demo app link | Streamlit app: https://shivam-benori.streamlit.app/ |
 | GitHub source link | Public repo: https://github.com/solpxlb/Benori_assignment |
 | Architecture diagram | Mermaid diagram in this README and [`docs/architecture.mmd`](docs/architecture.mmd) |
 | Raw data in CSV/JSON | App downloads: `raw_articles.csv`, `raw_articles.json`; also written under `outputs/` for local runs |
